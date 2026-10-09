@@ -1,9 +1,9 @@
 <?php
 /**
  * Plugin Name: Coquille Revue
- * Plugin URI:  https://atelier4fdigital.com
- * Description: Relecture de contenu directement sur les pages : icône flottante, sélection de texte ou de zone, suggestions enregistrées dans WordPress. Réservé aux utilisateurs connectés par défaut, mode public (visiteurs, avec anti-spam) activable depuis la page d'admin. E-mail de remerciement au contributeur quand sa suggestion est appliquée. Export CSV/JSON/Markdown. Application des corrections avec Claude Code (/apply-review).
- * Version:     2.5.0-dev
+ * Plugin URI:  https://github.com/Atelier-4F-digital/coquille-revue
+ * Description: Relecture de contenu directement sur les pages : icône flottante, sélection de texte ou de zone, suggestions enregistrées dans WordPress. Réservé aux utilisateurs connectés par défaut, mode public (visiteurs, avec anti-spam) activable depuis la page d'admin. E-mail de remerciement au contributeur quand sa suggestion est appliquée. Export CSV/JSON/Markdown. Application des corrections avec Claude Code (/coquille-revue:apply-review).
+ * Version:     2.5.0
  * Author:      Atelier 4F Digital
  * Author URI:  https://atelier4fdigital.com
  * Text Domain: coquille-revue
@@ -15,7 +15,7 @@
 
 defined('ABSPATH') || exit;
 
-const COQUILLE_REVUE_VERSION    = '2.5.0-dev';
+const COQUILLE_REVUE_VERSION    = '2.5.0';
 const COQUILLE_REVUE_DB_VERSION = '3';
 const COQUILLE_REVUE_AUTHOR_URL = 'https://atelier4fdigital.com';
 const COQUILLE_REVUE_AUTHOR     = 'Atelier 4F Digital';

@@ -2,7 +2,7 @@
 
 Toutes les évolutions notables de Coquille Revue. Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/), versions en [SemVer](https://semver.org/lang/fr/).
 
-## [2.5.0] — en cours
+## [2.5.0] — 2026-10-09
 
 ### Ajouté
 

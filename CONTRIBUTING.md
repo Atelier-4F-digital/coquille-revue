@@ -1,0 +1,37 @@
+# Contribuer à Coquille Revue
+
+Merci de votre intérêt ! Les tickets et propositions sont les bienvenus, en français ou en anglais.
+
+## Signaler un bug ou proposer une idée
+
+Ouvrez un ticket (Issue) en précisant : la version de l'extension, de WordPress et de PHP, si le site est en multisite, les étapes pour reproduire le problème, et ce que vous attendiez. Pour une faille de sécurité, suivez plutôt [SECURITY.md](SECURITY.md).
+
+## Proposer une modification
+
+1. Créez une branche à partir de `main`.
+2. Faites une modification ciblée, testée sur un WordPress local (idéalement aussi en multisite).
+3. Décrivez le changement dans [CHANGELOG.md](CHANGELOG.md), section de la version en cours.
+4. Ouvrez une demande de fusion (Pull Request) qui explique le pourquoi du changement.
+
+## Environnement de développement
+
+- Un WordPress local (Local, wp-env, Docker…) avec [WP-CLI](https://wp-cli.org/), en simple site et en multisite en sous-répertoires.
+- Le zip de l'extension se construit avec `bash bin/build-zip.sh` (à partir du dernier commit).
+- Le plugin Claude Code se vérifie avec `claude plugin validate ./claude-plugin` et `claude plugin validate .`, et se teste localement avec `claude --plugin-dir ./claude-plugin`.
+
+## Règles du code
+
+- **Préfixe unique** : `coquille_revue_` pour les fonctions, options, transients, actions et nonces ; `COQUILLE_REVUE_` pour les constantes ; `coquille-` pour les identifiants et classes HTML/CSS.
+- **Multisite** : la table est commune au réseau (`coquille_revue_table()`). Toute lecture ou écriture d'annotations filtre sur `get_current_blog_id()`.
+- **Sécurité** : nettoyer chaque entrée, échapper chaque sortie, vérifier droits et nonce sur chaque action, requêtes SQL préparées.
+- **Données personnelles** : l'e-mail et l'adresse IP ne sortent jamais dans l'API ni dans les exports destinés à Claude Code.
+- **Règles pour Claude Code** : elles vivent à deux endroits, à garder cohérents : `coquille_revue_claude_code_rules()` (exports) et `claude-plugin/skills/apply-review/SKILL.md` (qui prime).
+- **Base de données** : changer le schéma impose d'augmenter `COQUILLE_REVUE_DB_VERSION` ; `coquille_revue_maybe_upgrade()` est le seul point d'entrée des mises à jour.
+
+## Licence
+
+En contribuant, vous acceptez que votre contribution soit publiée sous [GPL-2.0-or-later](LICENSE).
+
+---
+
+**English summary.** Issues and pull requests are welcome in English or French. Branch from `main`, keep changes focused and tested on a local WordPress (single site and multisite), update `CHANGELOG.md`, and explain the why in your pull request. Use the `coquille_revue_` prefix, scope every annotation query to `get_current_blog_id()`, sanitize input, escape output, check capabilities and nonces, never expose email or IP addresses to the API or the Claude Code exports, and keep the Claude Code rules consistent between `coquille_revue_claude_code_rules()` and `SKILL.md`. Contributions are licensed under GPL-2.0-or-later. Security issues: see [SECURITY.md](SECURITY.md).

@@ -1,6 +1,6 @@
 {
   "name": "coquille-revue",
-  "version": "2.5.0-dev",
+  "version": "2.5.0",
   "description": "Applique, avec l'accord de l'utilisateur, les corrections laissées par des relecteurs sur un site WordPress avec l'extension Coquille Revue. Passe par WP-CLI : aucun mot de passe, et le texte des visiteurs ne transite jamais par une ligne de commande.",
   "author": {
     "name": "Atelier 4F Digital",
