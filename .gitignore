@@ -1,0 +1,14 @@
+/build/
+/vendor/
+/node_modules/
+*.zip
+*.log
+.env
+.env.*
+CLAUDE.local.md
+.claude/settings.local.json
+.DS_Store
+Thumbs.db
+desktop.ini
+.idea/
+.vscode/
