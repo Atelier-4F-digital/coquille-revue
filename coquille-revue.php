@@ -1083,10 +1083,10 @@ function coquille_revue_notify_contributor($row) {
 // EXPORT CSV / JSON / Markdown
 // ─────────────────────────────────────────────────────────────────────────────
 
-add_action('admin_post_cr_export', 'coquille_revue_handle_export');
-add_action('admin_post_cr_reset', 'coquille_revue_handle_reset');
-add_action('admin_post_cr_toggle_public', 'coquille_revue_handle_toggle_public');
-add_action('admin_post_cr_change_status', 'coquille_revue_handle_change_status');
+add_action('admin_post_coquille_revue_export', 'coquille_revue_handle_export');
+add_action('admin_post_coquille_revue_reset', 'coquille_revue_handle_reset');
+add_action('admin_post_coquille_revue_toggle_public', 'coquille_revue_handle_toggle_public');
+add_action('admin_post_coquille_revue_change_status', 'coquille_revue_handle_change_status');
 
 function coquille_revue_handle_change_status() {
     if (!current_user_can('edit_posts')) wp_die('Forbidden', 403);
