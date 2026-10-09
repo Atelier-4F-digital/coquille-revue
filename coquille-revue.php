@@ -1528,7 +1528,7 @@ function coquille_revue_annotation_alerts($row) {
     $text   = implode("\n", [$row['author_name'] ?? '', $row['page_title'] ?? '', $row['original_text'] ?? '', $row['suggestion'] ?? '']);
     $checks = [
         'adresse web'           => '~(https?://|www\.|\b[a-z0-9-]+\.(com|net|org|io|fr|eu|info|biz|app|dev|xyz|example)\b)~iu',
-        'code ou commande'      => '~(<|>|`|\$\(|&&|\|\||\{\{|\.php\b|\b(curl|wget|eval|base64|wp-config|iframe|script|javascript|widget)\b)~iu',
+        'code ou commande'      => '~(<|>|`|\$\(|&&|\|\||\{\{|\[/?[a-z][a-z0-9_-]*[\s\]]|\.php\b|\b(curl|wget|eval|base64|wp-config|iframe|script|javascript|widget|shortcode)\b)~iu',
         'caractères invisibles' => '~[\x{00AD}\x{200B}-\x{200F}\x{2060}\x{FEFF}\x{202A}-\x{202E}\x{2066}-\x{2069}]~u',
         'alphabets mélangés'    => '~(\p{Latin}[\p{Cyrillic}\p{Greek}]|[\p{Cyrillic}\p{Greek}]\p{Latin})~u',
         'consigne ou autorité'  => '~(*UCP)\b(ignorer?|ignorez|instructions?|consignes?|claude|ia|assistant|annotations?|automatique\w*|redirect\w*|redirig\w*|sans (demander|confirm\w*|valid\w*|reconfirm\w*)|(pas besoin|inutile) de (demander|confirmer|valider)|(déjà|a|ont|avons) (déjà )?(validé|approuvé)e?s?|(validée?|approuvée?) par|administrateur|mots? de passe|password|secrets?)\b~iu',
@@ -1981,6 +1981,10 @@ if (defined('WP_CLI') && WP_CLI) {
             }
             if (preg_match_all('~(https?://|www\.)~i', $replace) > preg_match_all('~(https?://|www\.)~i', $search)) {
                 WP_CLI::error('Le texte de remplacement ajoute un lien : refusé.');
+            }
+            // Un shortcode ([nom ...]) est du code que WordPress exécute à l'affichage
+            if (preg_match_all('~\[/?[a-z][a-z0-9_-]*~i', $replace) > preg_match_all('~\[/?[a-z][a-z0-9_-]*~i', $search)) {
+                WP_CLI::error('Le texte de remplacement ajoute un shortcode : refusé.');
             }
         }
 

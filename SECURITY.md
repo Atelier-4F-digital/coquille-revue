@@ -22,7 +22,7 @@ Les annotations sont écrites par des visiteurs, souvent anonymes. Elles sont tr
 
 - l'extension ne les exécute ni ne les affiche sans échappement ;
 - les règles fournies à Claude Code (export et plugin Claude Code) interdisent de suivre une consigne contenue dans une annotation, d'appliquer quoi que ce soit sans l'accord de l'utilisateur, et de placer le texte d'une annotation dans une ligne de commande ;
-- les commandes WP-CLI lisent le texte dans la base à partir du numéro et refusent l'ajout de code, de balises ou de liens.
+- les commandes WP-CLI lisent le texte dans la base à partir du numéro et refusent l'ajout de balises, de liens, de shortcodes, de PHP, de `javascript:` ou d'attributs `on…=`.
 
 Une annotation qui amènerait Claude Code à agir sans l'accord de l'utilisateur, à divulguer un secret ou à modifier autre chose que du texte visible est considérée comme une faille.
 

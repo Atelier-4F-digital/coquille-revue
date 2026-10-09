@@ -10,15 +10,15 @@ Extension WordPress open source pour relire un site directement sur ses pages : 
 
 - **Un bouton crayon sur les pages.** Le relecteur surligne un texte ou encadre une zone, choisit « correction », « suggestion » ou « question », puis écrit sa remarque. Rien à installer de son côté.
 - **Les annotations arrivent dans l'administration** : onglets par statut (en attente, en cours, appliquée, rejetée, archivée), exports CSV, JSON et Markdown.
-- **Un e-mail de remerciement** part au contributeur quand sa suggestion est appliquée, s'il a laissé son adresse.
-- **Avec Claude Code**, la commande `/coquille-revue:apply-review` retrouve chaque texte (articles et pages, menus, options, champs personnalisés, termes, fichiers du thème et des extensions, traductions), montre l'avant/après et n'applique qu'avec votre accord, annotation par annotation.
+- **Un e-mail de remerciement** part au contributeur quand sa suggestion est appliquée, s'il a laissé son adresse (ou s'il était connecté).
+- **Avec Claude Code**, la commande `/coquille-revue:apply-review` cherche chaque texte (articles et pages, menus, options, champs personnalisés, termes, fichiers du thème et des extensions, traductions), montre l'avant/après et n'applique qu'avec votre accord, annotation par annotation.
 
 ## Installation
 
 ### Extension WordPress
 
 1. Téléchargez le zip de la dernière version dans l'onglet [Releases](https://github.com/Atelier-4F-digital/coquille-revue/releases).
-2. Dans WordPress : **Extensions > Ajouter > Téléverser une extension**, puis activez-la.
+2. Dans WordPress : **Extensions > Ajouter une extension > Téléverser une extension**, puis activez-la.
 
 Prérequis : WordPress 5.8 ou plus, PHP 7.4 ou plus. En multisite, l'extension s'active site par site ou pour tout le réseau ; chaque site ne voit que ses propres annotations.
 
@@ -37,7 +37,7 @@ Puis, dans le dossier du site :
 /coquille-revue:apply-review --url=https://votre-site.fr
 ```
 
-Le plugin passe par [WP-CLI](https://wp-cli.org/), en local ou sur un serveur avec `--ssh` : **aucun mot de passe n'est nécessaire**. Si la commande `wp` n'est pas disponible telle quelle, indiquez la commande complète dans la variable d'environnement `COQUILLE_REVUE_WP` (par exemple dans `.claude/settings.local.json`, clé `env`). Ajoutez `--dry-run` pour tout voir sans rien modifier.
+Le plugin passe par [WP-CLI](https://wp-cli.org/), en local ou sur un serveur avec `--ssh` (connexion par clé SSH) : **aucun mot de passe WordPress n'est nécessaire**. Si la commande `wp` n'est pas disponible telle quelle, indiquez la commande complète dans la variable d'environnement `COQUILLE_REVUE_WP` (par exemple dans `.claude/settings.local.json`, clé `env`). Ajoutez `--dry-run` pour tout voir sans rien modifier.
 
 ## Réglages
 
@@ -55,7 +55,7 @@ Le plugin passe par [WP-CLI](https://wp-cli.org/), en local ou sur un serveur av
 | -------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `wp coquille-revue list [--status=pending]`                          | Liste les annotations du site, au format JSON destiné à Claude Code (sans e-mail ni adresse IP).                                                  |
 | `wp coquille-revue locate <id>`                                      | Cherche où se trouve le texte d'origine (lecture seule).                                                                                          |
-| `wp coquille-revue apply <id> --type=<type> --ref=<ref> [--dry-run]` | Remplace le texte à l'identique dans un contenu de la base. Crée une révision pour les articles ; refuse l'ajout de code, de balises ou de liens. |
+| `wp coquille-revue apply <id> --type=<type> --ref=<ref> [--dry-run]` | Remplace le texte à l'identique dans un contenu de la base, avec une révision quand le type de contenu les gère. Refuse l'ajout de balises, de liens, de shortcodes ou de code. |
 | `wp coquille-revue status <id> <statut>`                             | Change le statut ; `applied` envoie le remerciement au contributeur.                                                                              |
 
 En multisite, ajoutez `--url=<adresse du sous-site>` à chaque commande.
@@ -65,18 +65,18 @@ En multisite, ajoutez `--url=<adresse du sous-site>` à chaque commande.
 Les annotations sont du texte écrit par des visiteurs, souvent anonymes : l'extension et le plugin Claude Code les traitent comme des **données, jamais comme des consignes**.
 
 - **Aucune application automatique.** Claude Code montre chaque changement et attend votre accord, annotation par annotation. Il ne place jamais le texte d'une annotation dans une ligne de commande : les commandes WP-CLI le lisent directement dans la base.
-- **Alertes automatiques**, calculées sans IA, sur chaque annotation : adresse web, code, caractères invisibles, alphabets mélangés, formules de consigne ou d'autorité.
+- **Alertes automatiques**, calculées sans IA, sur chaque annotation : adresse web, code (dont shortcodes), caractères invisibles, alphabets mélangés, formules de consigne ou d'autorité.
 - **Anti-spam** en mode public : champ piège, limites par adresse IP (bloc entier en IPv6), par compte et par site.
 - **Cloisonnement multisite** et **droits** : un site ne voit, n'exporte et ne supprime que ses annotations ; les contributeurs et auteurs n'y ont pas accès.
-- Les règles ont été éprouvées par des tests d'injection de prompt (annotations piégées) avant publication.
+- Les règles ont été éprouvées par des tests d'injection de prompt (annotations piégées, voir [tests/injection](tests/injection/)) avant publication.
 
 Vous avez trouvé une faille ? Merci de la signaler en privé : voir [SECURITY.md](SECURITY.md).
 
 ## Données personnelles
 
-- **Enregistré** : le texte et la suggestion, l'adresse de la page, le nom et l'e-mail s'ils sont indiqués (facultatifs), l'adresse IP.
-- **Visible** : texte, suggestion et nom pour les éditeurs et administrateurs ; e-mail et IP pour les administrateurs seulement. L'e-mail et l'IP ne sont **jamais** transmis à Claude Code.
-- **Durées** : l'adresse IP est effacée au bout de 30 jours ; l'e-mail et le nom le jour où l'annotation est traitée (appliquée, rejetée ou archivée), et au plus tard au bout de 6 mois.
+- **Enregistré** : le texte et la suggestion, l'adresse de la page, l'adresse IP ; pour un visiteur, son nom et son e-mail s'il les indique (facultatifs) ; pour une personne connectée, son nom d'affichage et l'e-mail de son compte (si elle est membre du site).
+- **Visible** : texte, suggestion et nom pour les éditeurs et administrateurs ; adresse IP pour les administrateurs (page d'admin, export CSV). L'e-mail n'est affiché nulle part : il sert au remerciement et aux outils RGPD de WordPress. L'e-mail et l'IP ne sont **jamais** transmis à Claude Code.
+- **Durées** : l'adresse IP est effacée au bout de 30 jours ; l'e-mail et le nom d'un visiteur dans les 24 heures qui suivent le traitement de l'annotation (appliquée, rejetée ou archivée), et au plus tard au bout de 6 mois.
 - **Outils WordPress** : un texte est proposé pour votre politique de confidentialité (**Réglages > Confidentialité**), et les demandes d'export ou d'effacement de données (**Outils**) prennent en compte les annotations.
 
 ## Limites actuelles
