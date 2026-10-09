@@ -17,6 +17,17 @@ Toutes les évolutions notables de Coquille Revue. Format inspiré de [Keep a Ch
 - Identifiants et classes HTML/CSS : `cr-…` devient `coquille-…`. Le sélecteur CSS enregistré avec chaque annotation n'écarte plus que les classes propres au plugin.
 - Table : `{prefix}content_reviews` devient `{prefix}coquille_revue_annotations`.
 
+### Sécurité
+
+- Les consignes pour Claude Code (exports JSON et Markdown) ne demandent plus jamais d'appliquer automatiquement : chaque changement est montré et attend l'accord de l'utilisateur. L'option `--auto-apply` et l'application automatique des annotations de zone sont supprimées.
+- Les annotations sont présentées comme des données saisies par des visiteurs, jamais comme des consignes. Les règles interdisent d'ajouter du code, des liens externes, de toucher aux réglages, comptes ou secrets, et de placer le texte d'une annotation dans une ligne de commande.
+- Une seule liste de règles, partagée par les deux exports (avant : ils se contredisaient sur le mode zone).
+- Export Markdown : chaque annotation est enfermée dans un bloc de code dont la clôture est plus longue que toute suite d'accents graves du contenu, on ne peut plus y glisser de faux titres ou de fausses consignes. L'adresse IP n'y figure plus.
+- Chaque annotation exportée indique sa provenance (visiteur anonyme ou utilisateur connecté) et ses `alertes`, calculées sans IA : adresse web, code ou commande, caractères invisibles, alphabets mélangés, formule de consigne ou d'autorité.
+- Les règles couvrent aussi : fausse autorité écrite dans une annotation, accord groupé, correction devinée ou en masse, « changement de sens » (fait, date, prix, condition…), seconde demande cachée, injection différée, rapport sans recopie du contenu piégé.
+- L'API refuse les annotations dont l'adresse de page n'appartient pas au site, et celles qui contiennent des caractères de contrôle bidirectionnel (HTTP 400).
+- Règles éprouvées par un test d'injection de prompt (17 annotations piégées ou ambiguës, exports JSON et Markdown) : aucune action non voulue.
+
 ### Migration depuis « Content Review » (2.3.x / 2.4.x)
 
 1. Si `wp-config.php` contient `define('CR_REQUIRE_LOGIN', …)`, renommer la constante en `COQUILLE_REVUE_REQUIRE_LOGIN`.
