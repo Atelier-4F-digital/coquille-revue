@@ -8,10 +8,11 @@
 /.gitignore        export-ignore
 /.gitattributes    export-ignore
 /.distignore       export-ignore
+/.claude           export-ignore
+/.claude-plugin    export-ignore
 /bin               export-ignore
 /tests             export-ignore
 /claude-plugin     export-ignore
-/.claude-plugin    export-ignore
 /wporg-assets      export-ignore
 /phpcs.xml.dist    export-ignore
 /composer.json     export-ignore
@@ -20,3 +21,4 @@
 /CHANGELOG.md      export-ignore
 /CONTRIBUTING.md   export-ignore
 /SECURITY.md       export-ignore
+/CLAUDE.md         export-ignore

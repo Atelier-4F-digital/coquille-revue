@@ -5,7 +5,7 @@ set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
-version=$(sed -n 's/^ \* Version:[[:space:]]*//p' coquille-revue.php | tr -d '\r')
+version=$(git show HEAD:coquille-revue.php | sed -n 's/^ \* Version:[[:space:]]*//p' | tr -d '\r' | sed 's/[[:space:]]*$//')
 if [ -z "$version" ]; then
   echo "Version introuvable dans coquille-revue.php" >&2
   exit 1

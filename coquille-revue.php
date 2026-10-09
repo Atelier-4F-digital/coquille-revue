@@ -474,7 +474,7 @@ function coquille_revue_inject_review_ui() {
           let sel = node.tagName.toLowerCase();
           if (node.id) { parts.unshift('#' + node.id); break; }
           if (node.className && typeof node.className === 'string') {
-            const cls = [...node.classList].filter(c => !c.startsWith('coquille-')).slice(0,2).join('.');
+            const cls = [...node.classList].filter(c => !/^coquille-(mode-active|cursor-text|cursor-zone|zone-preview|drawing|active|visible|invalid|show|success|error)$/.test(c)).slice(0,2).join('.');
             if (cls) sel += '.' + cls;
           }
           parts.unshift(sel);
@@ -1032,7 +1032,7 @@ function coquille_revue_update_status(WP_REST_Request $request) {
 function coquille_revue_notify_admin($id, $url, $author) {
     wp_mail(
         get_option('admin_email'),
-        "[Review] Nouvelle annotation de {$author}",
+        "[Coquille Revue] Nouvelle annotation de {$author}",
         "Page : {$url}\nAuteur : {$author}\n\n" . admin_url("admin.php?page=coquille-revue")
     );
 }

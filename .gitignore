@@ -3,6 +3,8 @@
 /node_modules/
 *.zip
 *.log
+*.sql
+*.sql.gz
 .env
 .env.*
 CLAUDE.local.md
