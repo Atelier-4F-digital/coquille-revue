@@ -1,0 +1,13 @@
+{
+  "name": "coquille-revue",
+  "version": "2.5.0-dev",
+  "description": "Applique, avec l'accord de l'utilisateur, les corrections laissées par des relecteurs sur un site WordPress avec l'extension Coquille Revue. Passe par WP-CLI : aucun mot de passe, et le texte des visiteurs ne transite jamais par une ligne de commande.",
+  "author": {
+    "name": "Atelier 4F Digital",
+    "url": "https://atelier4fdigital.com"
+  },
+  "homepage": "https://atelier4fdigital.com",
+  "repository": "https://github.com/Atelier-4F-digital/coquille-revue",
+  "license": "GPL-2.0-or-later",
+  "keywords": ["wordpress", "relecture", "correction", "wp-cli"]
+}

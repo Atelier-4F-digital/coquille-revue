@@ -4,6 +4,11 @@ Toutes les évolutions notables de Coquille Revue. Format inspiré de [Keep a Ch
 
 ## [2.5.0] — en cours
 
+### Ajouté
+
+- **Commandes WP-CLI** `wp coquille-revue list | locate | apply | status`, utilisées par Claude Code. Le texte des annotations est lu dans la base à partir du numéro : il ne passe jamais par une ligne de commande. `locate` cherche le texte dans les articles et pages, menus, options, champs personnalisés, termes, fichiers du thème et des extensions, traductions, ainsi que sur la page elle-même, en tenant compte des apostrophes et guillemets typographiques et des espaces insécables. `apply` remplace le texte à l'identique dans un contenu de la base, crée une révision pour les articles, et refuse l'ajout de code, de balises ou de liens, les occurrences multiples (sauf `--toutes`), les questions et les annotations avec alertes (sauf `--ignorer-alertes`).
+- **Plugin Claude Code** `coquille-revue` (dossier `claude-plugin/`, catalogue `.claude-plugin/marketplace.json`) avec la commande `/coquille-revue:apply-review` : règles de sécurité prioritaires sur celles de l'export, accord annotation par annotation, aucune application automatique, aucun mot de passe nécessaire. Installation : `claude plugin marketplace add Atelier-4F-digital/coquille-revue` puis `claude plugin install coquille-revue@atelier-4f-digital`.
+
 ### Changé (incompatible avec les versions précédentes)
 
 - Nom unique « Coquille Revue » partout (titre d'admin, menu, exports, sujet de l'e-mail admin `[Coquille Revue]` au lieu de `[Review]`).
@@ -33,7 +38,7 @@ Toutes les évolutions notables de Coquille Revue. Format inspiré de [Keep a Ch
 - **Droits** : gérer les annotations (liste, statuts, exports, API) demande `edit_others_posts` (éditeurs et plus), filtrable avec `coquille_revue_manage_capability`. L'e-mail et l'adresse IP des visiteurs ne sont visibles que des administrateurs (`manage_options`).
 - **Champs** : longueurs maximales pour le titre, le XPath, le sélecteur, le nom et l'e-mail ; l'URL est enregistrée sans paramètres ni ancre ; les données de zone se limitent aux coordonnées et au nom de balise (plus d'extrait HTML de la page) ; le navigateur (user agent) n'est plus enregistré ; `platform` est fixé à `wordpress`.
 - **RGPD** : mention sous le formulaire visiteur, texte proposé pour la politique de confidentialité, export et effacement des données via les outils WordPress, effacement automatique des adresses IP au bout de 30 jours.
-- L'encadré « Connecter Claude Code » ne conseille plus de mettre le mot de passe d'application dans `CLAUDE.md`, mais dans des variables d'environnement ou `CLAUDE.local.md`, idéalement pour un compte dédié.
+- L'encadré « Connecter Claude Code » de l'admin explique l'installation du plugin Claude Code : plus aucun mot de passe d'application n'est demandé. L'export JSON ne contient plus les adresses de l'API.
 
 ### Migration depuis « Content Review » (2.3.x / 2.4.x)
 

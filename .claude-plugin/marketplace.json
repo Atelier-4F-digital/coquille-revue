@@ -1,0 +1,15 @@
+{
+  "name": "atelier-4f-digital",
+  "owner": {
+    "name": "Atelier 4F Digital",
+    "url": "https://atelier4fdigital.com"
+  },
+  "description": "Outils Claude Code d'Atelier 4F Digital",
+  "plugins": [
+    {
+      "name": "coquille-revue",
+      "source": "./claude-plugin",
+      "description": "Applique, avec ton accord, les corrections laissées sur un site WordPress avec l'extension Coquille Revue."
+    }
+  ]
+}
