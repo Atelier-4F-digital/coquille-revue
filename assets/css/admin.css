@@ -39,10 +39,17 @@
 }
 .coquille-revue-admin .coquille-revue-settings {
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   gap: 12px;
   flex-wrap: wrap;
   margin: 10px 0;
+}
+.coquille-revue-admin .coquille-revue-settings fieldset {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 1;
+  min-width: 260px;
 }
 
 /* Encart Claude Code */

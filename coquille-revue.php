@@ -51,6 +51,11 @@ function coquille_revue_can_toggle_mode() {
 function coquille_revue_thanks_enabled() {
     return (bool) get_option('coquille_revue_thank_contributors', 1);
 }
+// Crédit public « proposé par Atelier 4F Digital » dans la fenêtre d'information du crayon : réglage propre
+// à chaque site, désactivé par défaut (un crédit visible des visiteurs doit rester facultatif).
+function coquille_revue_show_credit() {
+    return (bool) get_option('coquille_revue_show_credit', 0);
+}
 
 // Anti-spam
 const COQUILLE_REVUE_RATE_LIMIT_PER_IP      = 5;     // annotations anonymes max par IP (bloc /64 en IPv6) en 5 minutes
@@ -285,7 +290,6 @@ function coquille_revue_render_overlay() {
     $ask_email = coquille_revue_thanks_enabled();
     $max       = COQUILLE_REVUE_MAX_LENGTHS;
     ?>
-    <!-- Coquille Revue Plugin v<?php echo esc_html(COQUILLE_REVUE_VERSION); ?> · <?php echo esc_html(COQUILLE_REVUE_AUTHOR); ?> -->
     <div id="coquille-revue-root">
     <div id="coquille-page-dim"></div>
     <div id="coquille-zone-rect"></div>
@@ -304,10 +308,12 @@ function coquille_revue_render_overlay() {
       <h3 id="coquille-info-title">✏️ Aide-nous à améliorer cette page</h3>
       <p>Vous avez repéré une coquille, un texte à reformuler, ou une zone à améliorer ? Activez le mode relecture pour nous laisser une suggestion directement sur la page.</p>
       <button class="coquille-info-cta" id="coquille-info-start">✏️ Commencer la relecture</button>
+      <?php if (coquille_revue_show_credit()): ?>
       <div class="coquille-info-credit">
         Plugin <strong>Coquille Revue</strong> · proposé par
         <a href="<?php echo esc_url(COQUILLE_REVUE_AUTHOR_URL); ?>" target="_blank" rel="noopener noreferrer"><?php echo esc_html(COQUILLE_REVUE_AUTHOR); ?> ↗</a>
       </div>
+      <?php endif; ?>
     </div>
 
     <!-- Barre de contrôles (visible quand mode actif) -->
@@ -317,7 +323,7 @@ function coquille_revue_render_overlay() {
         <?php if ($is_logged): ?>
           Mode relecture — connecté en tant que <strong><?php echo esc_html($user_name); ?></strong>
         <?php else: ?>
-          Mode relecture · plugin par <a href="<?php echo esc_url(COQUILLE_REVUE_AUTHOR_URL); ?>" target="_blank" rel="noopener noreferrer"><?php echo esc_html(COQUILLE_REVUE_AUTHOR); ?></a>
+          Mode relecture
         <?php endif; ?>
       </span>
       <span id="coquille-hint">
@@ -881,7 +887,7 @@ function coquille_revue_privacy_erase($email, $page = 1) {
 add_action('admin_post_coquille_revue_export', 'coquille_revue_handle_export');
 add_action('admin_post_coquille_revue_reset', 'coquille_revue_handle_reset');
 add_action('admin_post_coquille_revue_toggle_public', 'coquille_revue_handle_toggle_public');
-add_action('admin_post_coquille_revue_save_thanks', 'coquille_revue_handle_save_thanks');
+add_action('admin_post_coquille_revue_save_settings', 'coquille_revue_handle_save_settings');
 add_action('admin_post_coquille_revue_change_status', 'coquille_revue_handle_change_status');
 
 // Paramètres d'adresse de l'administration : une valeur hors liste, ou un tableau à la place d'un texte,
@@ -912,14 +918,15 @@ function coquille_revue_handle_change_status() {
     exit;
 }
 
-function coquille_revue_handle_save_thanks() {
+// Réglages propres à ce site : remerciement des contributeurs et crédit public.
+function coquille_revue_handle_save_settings() {
     if (!current_user_can('manage_options')) wp_die('Forbidden', 403);
-    check_admin_referer('coquille_revue_save_thanks');
+    check_admin_referer('coquille_revue_save_settings');
 
-    $enabled = !empty($_POST['coquille_revue_thank_contributors']);
-    update_option('coquille_revue_thank_contributors', $enabled ? 1 : 0);
+    update_option('coquille_revue_thank_contributors', empty($_POST['coquille_revue_thank_contributors']) ? 0 : 1);
+    update_option('coquille_revue_show_credit', empty($_POST['coquille_revue_show_credit']) ? 0 : 1);
     wp_safe_redirect(add_query_arg(
-        ['page' => 'coquille-revue', 'coquille_revue_msg' => $enabled ? 'thanks_on' : 'thanks_off'],
+        ['page' => 'coquille-revue', 'coquille_revue_msg' => 'settings_saved'],
         admin_url('admin.php')
     ));
     exit;
@@ -1705,8 +1712,7 @@ function coquille_revue_admin_page() {
         'status_changed'    => ['success', 'Statut mis à jour.'],
         'status_invalid'    => ['error',   'Statut invalide.'],
         'status_notfound'   => ['error',   'Annotation introuvable.'],
-        'thanks_on'         => ['success', 'E-mail de remerciement activé : il est proposé aux visiteurs et part quand leur suggestion est appliquée.'],
-        'thanks_off'        => ['success', 'E-mail de remerciement désactivé : l\'adresse des visiteurs n\'est plus demandée.'],
+        'settings_saved'    => ['success', 'Réglages enregistrés.'],
     ];
     $msg = coquille_revue_query_choice('coquille_revue_msg', array_keys($flash_map), '');
     if ($msg !== '') {
@@ -1743,16 +1749,23 @@ function coquille_revue_admin_page() {
     }
     echo '</div>';
 
-    // Remerciement aux contributeurs : réglage de ce site, réservé à ses administrateurs
+    // Réglages de ce site, réservés à ses administrateurs
     if (current_user_can('manage_options')) {
         printf('<form method="post" action="%s" class="coquille-revue-settings">', esc_url(admin_url('admin-post.php')));
-        echo '<input type="hidden" name="action" value="coquille_revue_save_thanks">';
-        wp_nonce_field('coquille_revue_save_thanks');
+        echo '<input type="hidden" name="action" value="coquille_revue_save_settings">';
+        wp_nonce_field('coquille_revue_save_settings');
+        echo '<fieldset><legend class="screen-reader-text">Réglages de ce site</legend>';
         printf(
             '<label><input type="checkbox" name="coquille_revue_thank_contributors" value="1"%s> <strong>E-mail de remerciement</strong> : demander leur e-mail (facultatif) aux visiteurs et prévenir le contributeur quand sa suggestion est appliquée (au plus %d e-mails par jour, un seul par adresse).</label>',
             checked(coquille_revue_thanks_enabled(), true, false),
             (int) COQUILLE_REVUE_THANKS_PER_SITE
         );
+        printf(
+            '<label><input type="checkbox" name="coquille_revue_show_credit" value="1"%s> <strong>Crédit</strong> : afficher « Coquille Revue, proposé par %s » et un lien vers son site dans la fenêtre d\'information du crayon.</label>',
+            checked(coquille_revue_show_credit(), true, false),
+            esc_html(COQUILLE_REVUE_AUTHOR)
+        );
+        echo '</fieldset>';
         echo '<button type="submit" class="button">Enregistrer</button>';
         echo '</form>';
     }

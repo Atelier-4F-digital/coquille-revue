@@ -61,8 +61,6 @@ body.coquille-mode-active #coquille-bar{display:flex;transform:translateY(0)}
 
 #coquille-label{color:#aaa;font-size:13px;font-weight:500;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 #coquille-label strong{color:#f0f0f0}
-#coquille-label a{color:#facc15;text-decoration:none}
-#coquille-label a:hover{text-decoration:underline}
 
 #coquille-hint{
   color:#666;font-size:11px;font-style:italic;
