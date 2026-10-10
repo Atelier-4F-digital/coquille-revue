@@ -20,6 +20,7 @@ Toutes les évolutions notables de Coquille Revue. Format inspiré de [Keep a Ch
 - Page d'admin : 50 annotations par page avec pagination, colonne « Alertes » (les mêmes que dans les exports pour Claude Code), texte complet du texte d'origine et de la suggestion au survol, confirmation avant « Appliqué » quand un remerciement va partir.
 - Réglage par site « Crédit » (désactivé par défaut), réservé aux administrateurs du site : affiche « Coquille Revue, proposé par Atelier 4F Digital » et un lien dans la fenêtre d'information du crayon. Les deux réglages du site (remerciement et crédit) sont enregistrés par un seul formulaire.
 - Filtre `coquille_revue_load_overlay` (booléen) : renvoyer `false` pour ne pas charger l'interface de relecture sur une page.
+- Désinstallation : supprimer l'extension depuis l'écran Extensions efface la table des annotations, les réglages et les tâches planifiées, sur chaque site du réseau (`uninstall.php`). La simple désactivation garde tout.
 
 ### Modifications
 
