@@ -20,6 +20,7 @@ Toutes les évolutions notables de Coquille Revue. Format inspiré de [Keep a Ch
 ### Modifications
 
 - Interface publique : le CSS et le JavaScript ne sont plus écrits dans chaque page. WordPress les charge depuis `assets/css/overlay.css` et `assets/js/overlay.js` (script en pied de page, en `defer`), avec la version de l'extension en `?ver=`. La configuration (adresse de l'API, jeton, longueurs maximales, textes) est passée dans `window.coquilleRevueConfig`. Rien n'est chargé quand l'interface ne s'affiche pas (mode privé et visiteur non connecté). Avec une règle CSP stricte, seule cette configuration écrite dans la page a besoin d'un nonce (filtre `wp_inline_script_attributes`). Après une mise à jour, vider le cache de page ; si un outil d'optimisation retarde ou fusionne les scripts, en exclure `coquille-revue`.
+- Page d'admin : styles dans `assets/css/admin.css`, chargé seulement sur la page Coquille Revue (plus aucun attribut `style`). Couleurs des statuts plus foncées, pour un contraste d'au moins 4,5:1 ; icônes de WordPress (dashicons) à la place des emojis ; tout le texte est échappé au moment de l'affichage.
 
 ### Sécurité
 
@@ -27,6 +28,7 @@ Toutes les évolutions notables de Coquille Revue. Format inspiré de [Keep a Ch
 - Export CSV : une cellule qui commence par `=`, `+`, `-`, `@`, une tabulation ou un retour à la ligne est précédée d'une apostrophe, pour qu'un tableur ne l'exécute pas comme une formule ; les guillemets sont doublés, sans caractère d'échappement.
 - Export Markdown : dans le bloc de données, chaque ligne d'une valeur est décalée de deux espaces ; un visiteur ne peut plus y écrire de fausse ligne `url:`, `auteur:` ou `suggestion:`.
 - Alertes : l'« adresse web » reconnaît aussi `mailto:`, `tel:`, `data:`, `//hôte` et les domaines sans `www` aux extensions courantes (`.ru`, `.co`, `.io`…) ; `apply` refuse l'ajout de ces liens. Les formules de « consigne ou autorité » sont cherchées en français et en anglais, quelle que soit la langue du site.
+- « Tout supprimer » est un formulaire (POST) avec une case de confirmation obligatoire : la confirmation marche sans JavaScript et sous une CSP stricte, et un simple lien, même avec un jeton valide, ne supprime plus rien.
 - Anti-spam : en plus des limites existantes, au plus 10 envois anonymes par heure et par adresse IP, pour qu'une seule adresse ne puisse pas épuiser le quota du site (30 par heure).
 - Page d'admin : un paramètre d'adresse piégé (`coquille_revue_msg[]=1`, `format[]=…`) ne fait plus planter la page ; les liens ouverts dans un nouvel onglet ont `rel="noopener noreferrer"`.
 - Exports CSV, JSON et Markdown et `wp coquille-revue list` lisent la base par lots de 500 et écrivent au fil de l'eau : la mémoire reste stable quel que soit le nombre d'annotations.

@@ -952,11 +952,15 @@ function coquille_revue_handle_reset() {
     if (!current_user_can('manage_options')) wp_die('Forbidden', 403);
     check_admin_referer('coquille_revue_reset');
 
-    global $wpdb;
-    $wpdb->delete(coquille_revue_table(), ['blog_id' => get_current_blog_id()]);
+    // Seul le formulaire de la page d'admin, case de confirmation cochée, supprime : un lien, même avec un jeton valide, ne fait rien.
+    $confirmed = !empty($_POST['coquille_revue_confirm_reset']);
+    if ($confirmed) {
+        global $wpdb;
+        $wpdb->delete(coquille_revue_table(), ['blog_id' => get_current_blog_id()]);
+    }
 
     wp_safe_redirect(add_query_arg(
-        ['page' => 'coquille-revue', 'coquille_revue_msg' => 'reset_done'],
+        ['page' => 'coquille-revue', 'coquille_revue_msg' => $confirmed ? 'reset_done' : 'reset_unconfirmed'],
         admin_url('admin.php')
     ));
     exit;
@@ -1627,7 +1631,7 @@ if (defined('WP_CLI') && WP_CLI) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// PAGE D'ADMINISTRATION
+// PAGE D'ADMINISTRATION (styles : assets/css/admin.css)
 // ─────────────────────────────────────────────────────────────────────────────
 
 add_action('admin_menu', function () {
@@ -1635,39 +1639,24 @@ add_action('admin_menu', function () {
         'coquille-revue', 'coquille_revue_admin_page', 'dashicons-edit-large', 30);
 });
 
+// Pour une page de premier niveau, le suffixe vient du slug : il ne change pas avec la langue de l'administration.
+add_action('admin_enqueue_scripts', function ($hook_suffix) {
+    if ($hook_suffix !== 'toplevel_page_coquille-revue') return;
+    wp_enqueue_style('coquille-revue-admin', plugin_dir_url(__FILE__) . 'assets/css/admin.css', [], COQUILLE_REVUE_VERSION);
+});
+
 // $will_notify : le passage à « applied » enverra un remerciement, on demande donc confirmation avant.
 function coquille_revue_render_row_actions($id, $current_status, $return_status, $return_paged, $will_notify) {
     $transitions = [
-        'pending'     => [
-            ['in_progress', 'En cours',   '#3b82f6'],
-            ['applied',     'Appliqué',   '#22c55e'],
-            ['rejected',    'Rejeté',     '#ef4444'],
-            ['archived',    'Archiver',   '#6b7280'],
-        ],
-        'in_progress' => [
-            ['applied',     'Appliqué',   '#22c55e'],
-            ['rejected',    'Rejeté',     '#ef4444'],
-            ['pending',     'En attente', '#f59e0b'],
-            ['archived',    'Archiver',   '#6b7280'],
-        ],
-        'applied'     => [
-            ['pending',     'En attente', '#f59e0b'],
-            ['archived',    'Archiver',   '#6b7280'],
-        ],
-        'rejected'    => [
-            ['pending',     'En attente', '#f59e0b'],
-            ['archived',    'Archiver',   '#6b7280'],
-        ],
-        'archived'    => [
-            ['pending',     'Restaurer',  '#f59e0b'],
-        ],
+        'pending'     => ['in_progress' => 'En cours', 'applied' => 'Appliqué', 'rejected' => 'Rejeté', 'archived' => 'Archiver'],
+        'in_progress' => ['applied' => 'Appliqué', 'rejected' => 'Rejeté', 'pending' => 'En attente', 'archived' => 'Archiver'],
+        'applied'     => ['pending' => 'En attente', 'archived' => 'Archiver'],
+        'rejected'    => ['pending' => 'En attente', 'archived' => 'Archiver'],
+        'archived'    => ['pending' => 'Restaurer'],
     ];
 
-    $actions = $transitions[$current_status] ?? [];
-    if (empty($actions)) return '<span style="color:#aaa;font-size:11px">—</span>';
-
-    $html = '<div style="display:flex;flex-wrap:wrap;gap:4px">';
-    foreach ($actions as [$new_status, $label, $color]) {
+    echo '<div class="coquille-revue-actions">';
+    foreach ($transitions[$current_status] ?? [] as $new_status => $label) {
         $url = wp_nonce_url(
             add_query_arg(
                 ['action' => 'coquille_revue_change_status', 'id' => $id, 'new_status' => $new_status, 'return_status' => $return_status, 'return_paged' => $return_paged],
@@ -1676,19 +1665,17 @@ function coquille_revue_render_row_actions($id, $current_status, $return_status,
             'coquille_revue_change_status_' . $id
         );
         $confirm = $new_status === 'applied' && $will_notify
-            ? sprintf(' onclick="return confirm(\'%s\')"', esc_js('Un e-mail de remerciement va être envoyé au contributeur. Continuer ?'))
+            ? 'return confirm(' . wp_json_encode('Un e-mail de remerciement va être envoyé au contributeur. Continuer ?') . ')'
             : '';
-        $html .= sprintf(
-            '<a href="%s" class="button button-small" style="font-size:11px;color:%s;border-color:%s"%s>%s</a>',
+        printf(
+            '<a href="%s" class="button button-small coquille-status--%s"%s>%s</a>',
             esc_url($url),
-            esc_attr($color),
-            esc_attr($color),
-            $confirm,
+            esc_attr($new_status),
+            $confirm ? ' onclick="' . esc_attr($confirm) . '"' : '',
             esc_html($label)
         );
     }
-    $html .= '</div>';
-    return $html;
+    echo '</div>';
 }
 
 function coquille_revue_admin_page() {
@@ -1702,191 +1689,198 @@ function coquille_revue_admin_page() {
         'personal' => true,
     ]);
 
-    $colors = ['pending'=>'#f59e0b','in_progress'=>'#3b82f6','applied'=>'#22c55e','rejected'=>'#ef4444','archived'=>'#6b7280'];
-    $labels = ['pending'=>'En attente','in_progress'=>'En cours','applied'=>'Appliqué','rejected'=>'Rejeté','archived'=>'Archivé'];
+    $labels = ['pending' => 'En attente', 'in_progress' => 'En cours', 'applied' => 'Appliqué', 'rejected' => 'Rejeté', 'archived' => 'Archivé'];
+    $cut    = fn($text, $length) => mb_substr((string) $text, 0, $length) . (mb_strlen((string) $text) > $length ? '…' : '');
 
-    echo '<div class="wrap"><h1>Coquille Revue <span style="font-size:12px;color:#888;font-weight:normal;margin-left:8px">v' . esc_html(COQUILLE_REVUE_VERSION) . '</span></h1>';
+    echo '<div class="wrap coquille-revue-admin">';
+    printf('<h1>Coquille Revue <span class="coquille-revue-version">v%s</span></h1>', esc_html(COQUILLE_REVUE_VERSION));
 
     // Messages flash
     $flash_map = [
-        'reset_done'      => ['success', '🗑 Toutes les annotations de ce site ont été supprimées.'],
-        'now_public'      => ['success', '🌐 Mode <strong>public</strong> activé — n\'importe quel visiteur peut désormais annoter.'],
-        'now_private'     => ['success', '🔒 Mode <strong>privé</strong> activé — seuls les utilisateurs connectés (contributeurs et plus) peuvent annoter.'],
-        'mode_locked'     => ['error',   '⚠️ Le mode est verrouillé par <code>COQUILLE_REVUE_REQUIRE_LOGIN</code> dans <code>wp-config.php</code>. Supprimez la constante pour pouvoir basculer depuis cette page.'],
-        'status_changed'  => ['success', '✓ Statut mis à jour.'],
-        'status_invalid'  => ['error',   '⚠️ Statut invalide.'],
-        'status_notfound' => ['error',   '⚠️ Annotation introuvable.'],
-        'thanks_on'       => ['success', '✓ E-mail de remerciement activé : il est proposé aux visiteurs et part quand leur suggestion est appliquée.'],
-        'thanks_off'      => ['success', '✓ E-mail de remerciement désactivé : l\'adresse des visiteurs n\'est plus demandée.'],
+        'reset_done'        => ['success', 'Toutes les annotations de ce site ont été supprimées.'],
+        'reset_unconfirmed' => ['error',   'Rien n\'a été supprimé : cochez la case de confirmation à côté du bouton « Tout supprimer ».'],
+        'now_public'        => ['success', 'Mode <strong>public</strong> activé — n\'importe quel visiteur peut désormais annoter.'],
+        'now_private'       => ['success', 'Mode <strong>privé</strong> activé — seuls les utilisateurs connectés (contributeurs et plus) peuvent annoter.'],
+        'mode_locked'       => ['error',   'Le mode est verrouillé par <code>COQUILLE_REVUE_REQUIRE_LOGIN</code> dans <code>wp-config.php</code>. Supprimez la constante pour pouvoir basculer depuis cette page.'],
+        'status_changed'    => ['success', 'Statut mis à jour.'],
+        'status_invalid'    => ['error',   'Statut invalide.'],
+        'status_notfound'   => ['error',   'Annotation introuvable.'],
+        'thanks_on'         => ['success', 'E-mail de remerciement activé : il est proposé aux visiteurs et part quand leur suggestion est appliquée.'],
+        'thanks_off'        => ['success', 'E-mail de remerciement désactivé : l\'adresse des visiteurs n\'est plus demandée.'],
     ];
     $msg = coquille_revue_query_choice('coquille_revue_msg', array_keys($flash_map), '');
     if ($msg !== '') {
-        [$lvl, $txt] = $flash_map[$msg];
-        echo '<div class="notice notice-' . esc_attr($lvl) . ' is-dismissible"><p>' . $txt . '</p></div>';
+        [$level, $text] = $flash_map[$msg];
+        printf('<div class="notice notice-%s is-dismissible"><p>%s</p></div>', esc_attr($level), wp_kses($text, ['strong' => [], 'code' => []]));
     }
 
     // Bandeau public/privé avec bouton de bascule
     $is_private = coquille_revue_is_login_required();
-    $is_locked  = coquille_revue_login_mode_is_locked();
-    $can_toggle = coquille_revue_can_toggle_mode();
-    $toggle_url = esc_url(wp_nonce_url(admin_url('admin-post.php?action=coquille_revue_toggle_public'), 'coquille_revue_toggle_public'));
-
+    printf('<div class="notice inline coquille-revue-mode %s"><p>', esc_attr($is_private ? 'notice-info' : 'notice-warning'));
     if ($is_private) {
-        echo '<div class="notice notice-info inline" style="margin:10px 0;display:flex;align-items:center;gap:14px;flex-wrap:wrap"><p style="flex:1;margin:0">🔒 <strong>Mode privé</strong> — seuls les utilisateurs connectés (contributeurs et plus) peuvent annoter.</p>';
+        echo '<span class="dashicons dashicons-lock" aria-hidden="true"></span> <strong>Mode privé</strong> — seuls les utilisateurs connectés (contributeurs et plus) peuvent annoter.';
     } else {
-        echo '<div class="notice notice-warning inline" style="margin:10px 0;display:flex;align-items:center;gap:14px;flex-wrap:wrap"><p style="flex:1;margin:0">🌐 <strong>Mode public</strong> — n\'importe quel visiteur peut annoter (par adresse IP, au plus ' . COQUILLE_REVUE_RATE_LIMIT_PER_IP . ' envois en ' . (COQUILLE_REVUE_RATE_LIMIT_WINDOW / 60) . ' min et ' . COQUILLE_REVUE_RATE_LIMIT_PER_IP_HOUR . ' par heure ; ' . COQUILLE_REVUE_GLOBAL_LIMIT . ' envois anonymes par heure pour le site ; champ piège anti-robots).</p>';
+        printf(
+            '<span class="dashicons dashicons-admin-site-alt3" aria-hidden="true"></span> <strong>Mode public</strong> — n\'importe quel visiteur peut annoter (par adresse IP, au plus %1$d envois en %2$d min et %3$d par heure ; %4$d envois anonymes par heure pour le site ; champ piège anti-robots).',
+            (int) COQUILLE_REVUE_RATE_LIMIT_PER_IP,
+            (int) (COQUILLE_REVUE_RATE_LIMIT_WINDOW / 60),
+            (int) COQUILLE_REVUE_RATE_LIMIT_PER_IP_HOUR,
+            (int) COQUILLE_REVUE_GLOBAL_LIMIT
+        );
     }
-    if ($is_locked) {
-        echo '<span style="color:#888;font-size:12px">Verrouillé par <code>wp-config.php</code></span>';
-    } elseif (!$can_toggle) {
-        echo '<span style="color:#888;font-size:12px">Réglé par l\'administrateur du réseau</span>';
-    } elseif ($is_private) {
-        echo '<a class="button button-primary" href="' . $toggle_url . '">🌐 Passer en mode public</a>';
+    echo '</p>';
+    if (coquille_revue_login_mode_is_locked()) {
+        echo '<span class="coquille-revue-muted">Verrouillé par <code>wp-config.php</code></span>';
+    } elseif (!coquille_revue_can_toggle_mode()) {
+        echo '<span class="coquille-revue-muted">Réglé par l\'administrateur du réseau</span>';
     } else {
-        echo '<a class="button" href="' . $toggle_url . '">🔒 Passer en mode privé</a>';
+        printf(
+            '<a class="button%s" href="%s">%s</a>',
+            $is_private ? ' button-primary' : '',
+            esc_url(wp_nonce_url(admin_url('admin-post.php?action=coquille_revue_toggle_public'), 'coquille_revue_toggle_public')),
+            esc_html($is_private ? 'Passer en mode public' : 'Passer en mode privé')
+        );
     }
     echo '</div>';
 
     // Remerciement aux contributeurs : réglage de ce site, réservé à ses administrateurs
     if (current_user_can('manage_options')) {
-        echo '<form method="post" action="' . esc_url(admin_url('admin-post.php')) . '" style="margin:10px 0;display:flex;align-items:center;gap:12px;flex-wrap:wrap">';
+        printf('<form method="post" action="%s" class="coquille-revue-settings">', esc_url(admin_url('admin-post.php')));
         echo '<input type="hidden" name="action" value="coquille_revue_save_thanks">';
         wp_nonce_field('coquille_revue_save_thanks');
-        echo '<label><input type="checkbox" name="coquille_revue_thank_contributors" value="1"' . checked(coquille_revue_thanks_enabled(), true, false) . '> '
-            . '<strong>E-mail de remerciement</strong> : demander leur e-mail (facultatif) aux visiteurs et prévenir le contributeur quand sa suggestion est appliquée '
-            . '(au plus ' . COQUILLE_REVUE_THANKS_PER_SITE . ' e-mails par jour, un seul par adresse).</label>';
+        printf(
+            '<label><input type="checkbox" name="coquille_revue_thank_contributors" value="1"%s> <strong>E-mail de remerciement</strong> : demander leur e-mail (facultatif) aux visiteurs et prévenir le contributeur quand sa suggestion est appliquée (au plus %d e-mails par jour, un seul par adresse).</label>',
+            checked(coquille_revue_thanks_enabled(), true, false),
+            (int) COQUILLE_REVUE_THANKS_PER_SITE
+        );
         echo '<button type="submit" class="button">Enregistrer</button>';
         echo '</form>';
     }
 
     // Encart Claude Code : la skill passe par WP-CLI, aucun mot de passe n'est à créer.
-    echo '<div style="background:#f8fafc;border:1px solid #e2e8f0;border-left:4px solid #3b5bff;border-radius:6px;padding:14px 18px;margin:16px 0;">
-        <h2 style="margin:0 0 6px;font-size:14px">🤖 Appliquer les corrections avec Claude Code</h2>
-        <p style="margin:0 0 10px;color:#475569;font-size:13px;line-height:1.5">
-            Installe une fois le plugin Claude Code de Coquille Revue, puis lance <code>/coquille-revue:apply-review</code>
-            dans le dossier du site. Il passe par WP-CLI (en local ou par SSH) : aucun mot de passe à créer.
-            Chaque correction t\'est montrée avant d\'être appliquée, et attend ton accord.
-        </p>
-        <pre style="background:#0f172a;color:#e2e8f0;padding:10px 14px;border-radius:6px;font-size:12px;line-height:1.6;margin:0;overflow-x:auto">claude plugin marketplace add Atelier-4F-digital/coquille-revue
-claude plugin install coquille-revue@atelier-4f-digital
-/coquille-revue:apply-review --url=' . esc_html(home_url('/')) . '</pre>
-    </div>';
+    echo '<div class="coquille-revue-claude">';
+    echo '<h2>Appliquer les corrections avec Claude Code</h2>';
+    echo '<p>Installe une fois le plugin Claude Code de Coquille Revue, puis lance <code>/coquille-revue:apply-review</code> dans le dossier du site. '
+        . 'Il passe par WP-CLI (en local ou par SSH) : aucun mot de passe à créer. Chaque correction t\'est montrée avant d\'être appliquée, et attend ton accord.</p>';
+    printf(
+        "<pre>claude plugin marketplace add Atelier-4F-digital/coquille-revue\nclaude plugin install coquille-revue@atelier-4f-digital\n/coquille-revue:apply-review --url=%s</pre>",
+        esc_html(home_url('/'))
+    );
+    echo '</div>';
 
     // Onglets
     echo '<ul class="subsubsub">';
+    $last = array_key_last($counts);
     foreach ($counts as $s => $c) {
-        $active = $filter === $s ? 'current' : '';
-        $url    = esc_url(add_query_arg(['status' => $s, 'paged' => false, 'coquille_revue_msg' => false]));
-        echo "<li><a href='{$url}' class='{$active}'>" . esc_html($labels[$s]) . " <span class='count'>({$c})</span></a> | </li>";
+        printf(
+            '<li><a href="%s"%s>%s <span class="count">(%d)</span></a>%s</li>',
+            esc_url(add_query_arg(['status' => $s, 'paged' => false, 'coquille_revue_msg' => false])),
+            $filter === $s ? ' class="current" aria-current="page"' : '',
+            esc_html($labels[$s]),
+            (int) $c,
+            $s === $last ? '' : ' |'
+        );
     }
     echo '</ul><br class="clear">';
 
-    // Boutons d'export
-    $base = admin_url('admin-post.php?action=coquille_revue_export&status=' . urlencode($filter));
-    $url_csv  = esc_url(wp_nonce_url($base . '&format=csv',  'coquille_revue_export'));
-    $url_json = esc_url(wp_nonce_url($base . '&format=json', 'coquille_revue_export'));
-    $url_md   = esc_url(wp_nonce_url($base . '&format=md',   'coquille_revue_export'));
-    echo '<div style="display:flex;align-items:center;gap:10px;margin:8px 0 16px;flex-wrap:wrap">';
-    echo '<strong>Exporter cet onglet :</strong> ';
-    echo "<a class='button' href='{$url_csv}'>📥 CSV (Excel)</a>";
-    echo "<a class='button' href='{$url_json}'>📥 JSON (Claude Code)</a>";
-    echo "<a class='button' href='{$url_md}'>📥 Markdown (relecture)</a>";
-
-    // Bouton de reset (réservé aux admins, double confirmation)
+    // Exports, puis suppression de toutes les annotations : formulaire POST avec case obligatoire,
+    // qui fonctionne sans JavaScript (et donc aussi sous une CSP stricte).
+    echo '<div class="coquille-revue-toolbar">';
+    echo '<strong>Exporter cet onglet :</strong>';
+    foreach (['csv' => 'CSV (Excel)', 'json' => 'JSON (Claude Code)', 'md' => 'Markdown (relecture)'] as $format => $label) {
+        printf(
+            '<a class="button" href="%s"><span class="dashicons dashicons-download" aria-hidden="true"></span> %s</a>',
+            esc_url(wp_nonce_url(add_query_arg(['action' => 'coquille_revue_export', 'status' => $filter, 'format' => $format], admin_url('admin-post.php')), 'coquille_revue_export')),
+            esc_html($label)
+        );
+    }
     if (current_user_can('manage_options')) {
-        $total_all = array_sum($counts);
-        $reset_url = esc_url(wp_nonce_url(admin_url('admin-post.php?action=coquille_revue_reset'), 'coquille_revue_reset'));
-        $confirm   = esc_attr("Supprimer définitivement les {$total_all} annotation(s) ? Cette action est irréversible.");
-        echo "<span style='flex:1'></span>";
-        echo "<a class='button' style='color:#b91c1c;border-color:#b91c1c' href='{$reset_url}' onclick=\"return confirm('{$confirm}')\">🗑 Tout supprimer ({$total_all})</a>";
+        $total_all = (int) array_sum($counts);
+        printf('<form method="post" action="%s" class="coquille-revue-reset">', esc_url(admin_url('admin-post.php')));
+        echo '<input type="hidden" name="action" value="coquille_revue_reset">';
+        wp_nonce_field('coquille_revue_reset');
+        printf('<label><input type="checkbox" name="coquille_revue_confirm_reset" value="1" required> Supprimer définitivement les %d annotation(s) de ce site (irréversible)</label>', $total_all);
+        printf('<button type="submit" class="button coquille-revue-danger"><span class="dashicons dashicons-trash" aria-hidden="true"></span> Tout supprimer (%d)</button>', $total_all);
+        echo '</form>';
     }
     echo '</div>';
 
-    $endpoint = esc_url(rest_url('coquille-revue/v1/annotations?status=' . $filter));
-    echo "<div style='background:#1e1e1e;border:1px solid #333;border-radius:8px;padding:12px 16px;margin-bottom:16px;font-family:monospace;font-size:13px;color:#22c55e'>
-        <strong style='color:#aaa'>Endpoint API REST :</strong> {$endpoint}
-    </div>";
+    printf(
+        '<div class="coquille-revue-endpoint"><strong>Endpoint API REST :</strong> %s</div>',
+        esc_html(add_query_arg('status', $filter, rest_url('coquille-revue/v1/annotations')))
+    );
 
     $pagination = '';
     if ($pages > 1) {
-        $pagination = '<div class="tablenav"><div class="tablenav-pages"><span class="displaying-num">' . (int) $counts[$filter] . ' annotation(s)</span> '
-            . '<span class="pagination-links">' . paginate_links([
+        $pagination = sprintf(
+            '<div class="tablenav"><div class="tablenav-pages"><span class="displaying-num">%d annotation(s)</span> <span class="pagination-links">%s</span></div></div>',
+            (int) $counts[$filter],
+            paginate_links([
                 'base'    => add_query_arg(['paged' => '%#%', 'coquille_revue_msg' => false]),
                 'format'  => '',
                 'current' => $paged,
                 'total'   => $pages,
-            ]) . '</span></div></div>';
+            ])
+        );
     }
 
     if (empty($rows)) {
         echo '<p>Aucune annotation avec ce statut.</p>';
     } else {
-        echo $pagination;
-        echo '<table class="wp-list-table widefat fixed striped">';
-        echo '<thead><tr>
-            <th style="width:40px">ID</th>
-            <th>Page</th>
-            <th>Texte original</th>
-            <th>Suggestion</th>
-            <th style="width:130px">Alertes</th>
-            <th style="width:70px">Mode</th>
-            <th style="width:90px">Type</th>
-            <th style="width:120px">Auteur</th>
-            <th style="width:90px">Statut</th>
-            <th style="width:110px">Date</th>
-            <th style="width:230px">Actions</th>
-        </tr></thead><tbody>';
+        echo wp_kses_post($pagination);
+        echo '<table class="wp-list-table widefat fixed striped coquille-revue-table"><thead><tr>';
+        foreach (['id' => 'ID', 'page' => 'Page', 'original' => 'Texte original', 'suggestion' => 'Suggestion', 'alerts' => 'Alertes', 'mode' => 'Mode',
+            'type' => 'Type', 'author' => 'Auteur', 'status' => 'Statut', 'date' => 'Date', 'actions' => 'Actions'] as $col => $title) {
+            printf('<th scope="col" class="coquille-col-%s">%s</th>', esc_attr($col), esc_html($title));
+        }
+        echo '</tr></thead><tbody>';
 
         foreach ($rows as $row) {
-            $color = $colors[$row['status']] ?? '#888';
-            $orig  = esc_html(mb_substr($row['original_text'], 0, 70)) . (mb_strlen($row['original_text']) > 70 ? '…' : '');
-            $sugg  = esc_html(mb_substr($row['suggestion'], 0, 70)) . (mb_strlen($row['suggestion']) > 70 ? '…' : '');
-            $page  = esc_html(mb_substr($row['page_title'] ?: $row['url'], 0, 35));
-            $date  = date('d/m/y H:i', strtotime($row['created_at']));
-            $mode  = $row['annotation_mode'] ?? 'text';
-            $mode_pill = $mode === 'zone'
-                ? '<span style="background:#facc15;color:#111;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600">▭ zone</span>'
-                : '<span style="background:#e5e7eb;color:#374151;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600">📝 texte</span>';
+            $mode   = ($row['annotation_mode'] ?? 'text') === 'zone' ? 'zone' : 'text';
+            $alerts = coquille_revue_annotation_alerts($row); // les mêmes que dans les exports : à voir avant de cliquer sur « Appliqué »
 
-            $author_display = esc_html($row['author_name']);
+            echo '<tr>';
+            printf('<td>%d</td>', (int) $row['id']);
+            printf(
+                '<td><a href="%s" target="_blank" rel="noopener noreferrer" title="%s">%s</a></td>',
+                esc_url($row['url']),
+                esc_attr($row['url']),
+                esc_html(mb_substr($row['page_title'] ?: $row['url'], 0, 35))
+            );
+            printf('<td title="%s"><code>%s</code></td>', esc_attr($row['original_text']), esc_html($cut($row['original_text'], 70)));
+            printf('<td class="coquille-revue-suggestion" title="%s">%s</td>', esc_attr($row['suggestion']), esc_html($cut($row['suggestion'], 70)));
+            if ($alerts) {
+                printf('<td><span class="coquille-revue-alerts">%s</span></td>', esc_html(implode(', ', $alerts)));
+            } else {
+                echo '<td><span class="coquille-revue-muted">—</span></td>';
+            }
+            printf('<td><span class="coquille-pill coquille-pill--%s">%s</span></td>', esc_attr($mode), esc_html($mode === 'zone' ? 'zone' : 'texte'));
+            printf('<td><em>%s</em></td>', esc_html($row['type']));
+            echo '<td>' . esc_html($row['author_name']);
             if ((int) $row['author_id'] === 0) {
-                $author_display .= ' <em style="color:#999;font-size:11px">(anonyme)</em>';
+                echo ' <em class="coquille-revue-muted">(anonyme)</em>';
                 if (!empty($row['reviewer_ip'])) {
-                    $author_display .= '<br><code style="font-size:10px;color:#888">' . esc_html($row['reviewer_ip']) . '</code>';
+                    printf('<br><code class="coquille-revue-ip">%s</code>', esc_html($row['reviewer_ip']));
                 }
             }
-
-            // Mêmes alertes que dans les exports pour Claude Code : à voir avant de cliquer sur « Appliqué »
-            $alerts      = coquille_revue_annotation_alerts($row);
-            $alerts_html = $alerts
-                ? '<span style="display:inline-block;background:#fef2f2;color:#991b1b;border:1px solid #fecaca;border-radius:4px;padding:2px 6px;font-size:11px;line-height:1.4">' . esc_html(implode(', ', $alerts)) . '</span>'
-                : '<span style="color:#646970">—</span>';
-
-            $actions_html = coquille_revue_render_row_actions((int) $row['id'], $row['status'], $filter, $paged, !empty($row['will_notify']));
-
-            echo "<tr>
-                <td>" . (int) $row['id'] . "</td>
-                <td><a href='" . esc_url($row['url']) . "' target='_blank' rel='noopener noreferrer' title='" . esc_attr($row['url']) . "'>{$page}</a></td>
-                <td title='" . esc_attr($row['original_text']) . "'><code style='font-size:11px;background:#f6f7f7;padding:2px 4px'>{$orig}</code></td>
-                <td style='color:#155724' title='" . esc_attr($row['suggestion']) . "'>{$sugg}</td>
-                <td>{$alerts_html}</td>
-                <td>{$mode_pill}</td>
-                <td><em>" . esc_html($row['type']) . "</em></td>
-                <td>{$author_display}</td>
-                <td><span style='color:{$color};font-weight:600'>" . esc_html($labels[$row['status']]) . "</span></td>
-                <td style='color:#777'>{$date}</td>
-                <td>{$actions_html}</td>
-            </tr>";
+            echo '</td>';
+            printf('<td><span class="coquille-status coquille-status--%s">%s</span></td>', esc_attr($row['status']), esc_html($labels[$row['status']] ?? $row['status']));
+            printf('<td class="coquille-revue-muted">%s</td>', esc_html(mysql2date('d/m/y H:i', $row['created_at'])));
+            echo '<td>';
+            coquille_revue_render_row_actions((int) $row['id'], $row['status'], $filter, $paged, !empty($row['will_notify']));
+            echo '</td></tr>';
         }
 
         echo '</tbody></table>';
-        echo $pagination;
+        echo wp_kses_post($pagination);
     }
 
     // Crédit en pied de page
-    echo '<p style="margin-top:32px;padding-top:16px;border-top:1px solid #e5e7eb;color:#9ca3af;font-size:12px;text-align:center">';
-    echo 'Plugin <strong>Coquille Revue v' . esc_html(COQUILLE_REVUE_VERSION) . '</strong> · proposé par ';
-    echo '<a href="' . esc_url(COQUILLE_REVUE_AUTHOR_URL) . '" target="_blank" rel="noopener noreferrer" style="color:#3b5bff;text-decoration:none;font-weight:600">' . esc_html(COQUILLE_REVUE_AUTHOR) . ' ↗</a>';
-    echo '</p>';
+    printf(
+        '<p class="coquille-revue-credit">Plugin <strong>Coquille Revue v%s</strong> · proposé par <a href="%s" target="_blank" rel="noopener noreferrer">%s <span aria-hidden="true">↗</span></a></p>',
+        esc_html(COQUILLE_REVUE_VERSION),
+        esc_url(COQUILLE_REVUE_AUTHOR_URL),
+        esc_html(COQUILLE_REVUE_AUTHOR)
+    );
     echo '</div>';
 }
