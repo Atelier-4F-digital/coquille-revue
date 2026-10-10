@@ -19,7 +19,7 @@ A pencil button floats on every page. A reviewer turns on review mode, selects s
 = Who can annotate =
 
 * **Private mode (default):** only logged-in users who can edit posts (contributors and above).
-* **Public mode:** any visitor. An administrator (the network administrator on multisite) switches it on from the admin page, or locks the mode in `wp-config.php` with `COQUILLE_REVUE_REQUIRE_LOGIN`. Anonymous submissions go through anti-spam protection: a honeypot field, at most 5 submissions per IP address in 5 minutes and 10 per hour (a whole /64 block for IPv6), and at most 30 anonymous submissions per hour for the site.
+* **Public mode:** any visitor. An administrator (the network administrator on multisite) switches it on from the admin page, or locks the mode in `wp-config.php` with `COQUILLE_REVUE_REQUIRE_LOGIN`. Anonymous submissions go through anti-spam protection: a honeypot field, at most 5 submissions per IP address in 5 minutes and 10 per hour (per /64 block for IPv6), and at most 30 anonymous submissions per hour for the site.
 
 = Processing annotations =
 
@@ -32,7 +32,7 @@ A pencil button floats on every page. A reviewer turns on review mode, selects s
 
 = Apply corrections with Claude Code (optional) =
 
-This plugin does not call any AI service and does not run any AI model. If you use Claude Code, Anthropic's coding assistant, on your computer, a separate companion plugin for Claude Code, distributed on GitHub and not included in this plugin, reads the annotations through WP-CLI, shows you each change before and after, and applies only what you approve, one annotation at a time. See https://github.com/Atelier-4F-digital/coquille-revue
+This plugin does not call any AI service or run any AI model. If you use Claude Code, Anthropic's coding assistant, on your computer, a separate companion plugin for Claude Code, distributed on GitHub and not included in this plugin, reads the annotations through WP-CLI, shows you each change before and after, and applies only what you approve, one annotation at a time. See https://github.com/Atelier-4F-digital/coquille-revue
 
 = Multisite =
 
@@ -56,7 +56,7 @@ What is stored with each annotation:
 
 Who can see it: the text, the remark and the name are visible to the users who manage annotations (editors and above by default). The IP address is visible to administrators only (admin page and CSV export). The e-mail address is shown nowhere: it is only used for the thank-you e-mail and by the WordPress personal data tools. Neither the e-mail nor the IP address is included in the REST API, the JSON and Markdown exports or the WP-CLI output.
 
-How long: IP addresses are deleted after 30 days. A visitor's name and e-mail address are deleted once the annotation is processed (applied, rejected or archived), and after 6 months at the latest. Annotations of a deleted site are deleted.
+How long: IP addresses are deleted after 30 days. A visitor's name and e-mail address are deleted within a day of the annotation being processed (applied, rejected or archived), and after 6 months at the latest. Annotations of a deleted site are deleted.
 
 The plugin suggests a privacy policy text (Settings > Privacy) and supports the WordPress personal data export and erasure tools.
 
