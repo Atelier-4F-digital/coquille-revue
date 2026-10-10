@@ -225,6 +225,7 @@ body.coquille-mode-active #coquille-bar {
   font-size: 13px;
   font-weight: 500;
   flex: 1;
+  min-width: 0;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -240,6 +241,13 @@ body.coquille-mode-active #coquille-bar {
   display: flex;
   gap: 6px;
   align-items: center;
+  flex: 0 1 auto;
+  min-width: 0;
+}
+#coquille-hint > span {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 #coquille-hint kbd {
   background: var(--coquille-field);
@@ -274,8 +282,10 @@ body.coquille-mode-active #coquille-bar {
 }
 
 /* ── Bulle d'annotation ── */
+/* Fixée à l'écran, juste au-dessus de la barre (ou en haut, classe coquille-bubble-top) :
+   elle reste visible quelle que soit la position dans la page. */
 #coquille-bubble {
-  position: absolute;
+  position: fixed;
   z-index: 2147483645;
   background: var(--coquille-bg);
   border: 1px solid var(--coquille-line);
@@ -287,6 +297,14 @@ body.coquille-mode-active #coquille-bar {
   flex-direction: column;
   gap: 10px;
   bottom: 56px;
+  max-height: calc(100vh - 72px);
+  max-height: calc(100dvh - 72px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+#coquille-bubble.coquille-bubble-top {
+  top: 16px;
+  bottom: auto;
 }
 #coquille-bubble.coquille-visible {
   display: flex;
@@ -395,6 +413,9 @@ body.coquille-mode-active #coquille-bar {
 }
 #coquille-textarea-help {
   margin-top: -4px;
+}
+#coquille-revue-root .coquille-help-touch {
+  display: none;
 }
 
 #coquille-type-row {
@@ -577,7 +598,18 @@ body.coquille-mode-active #coquille-revue-root textarea {
   display: block;
 }
 
+/* En mode relecture, le crayon et les messages passent au-dessus de la barre (sinon ils cachent « Arrêter »). */
+body.coquille-mode-active #coquille-fab {
+  bottom: 64px;
+}
+body.coquille-mode-active #coquille-toast {
+  bottom: 128px;
+}
+
 @media (max-width: 600px) {
+  #coquille-hint {
+    flex: 1;
+  }
   #coquille-info-popover {
     width: calc(100vw - 32px);
     right: 16px;
@@ -593,6 +625,35 @@ body.coquille-mode-active #coquille-revue-root textarea {
   #coquille-fab {
     bottom: 16px;
     right: 16px;
+  }
+}
+
+/* Écran tactile : pas de sélection de zone, consignes adaptées, cibles plus grandes,
+   champs en 16 px (en dessous, iOS agrandit la page à la saisie). */
+@media (hover: none) and (pointer: coarse) {
+  #coquille-revue-root .coquille-hint-zone,
+  #coquille-revue-root .coquille-help-keys {
+    display: none;
+  }
+  #coquille-revue-root .coquille-help-touch {
+    display: inline;
+  }
+  #coquille-textarea,
+  #coquille-reviewer-name,
+  #coquille-reviewer-email {
+    font-size: 16px;
+  }
+  .coquille-type-btn {
+    padding: 10px 0;
+    font-size: 13px;
+  }
+  #coquille-send-btn,
+  #coquille-cancel-btn {
+    padding: 12px 14px;
+    font-size: 15px;
+  }
+  #coquille-stop-btn {
+    padding: 8px 14px;
   }
 }
 

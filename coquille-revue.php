@@ -335,7 +335,7 @@ function coquille_revue_render_overlay() {
       </span>
       <span id="coquille-hint">
         <svg class="coquille-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M4 7V4h16v3"/><path d="M9 20h6"/><path d="M12 4v16"/></svg>
-        <span>Sélectionnez du texte ou <kbd>clic + glisser</kbd> sur une zone<span class="coquille-sr-only">. Au clavier : sélectionnez le texte, puis appuyez sur Entrée</span></span>
+        <span>Sélectionnez du texte<span class="coquille-hint-zone"> ou <kbd>clic + glisser</kbd> sur une zone</span><span class="coquille-sr-only">. Au clavier : sélectionnez le texte, puis appuyez sur Entrée</span></span>
       </span>
       <button type="button" id="coquille-stop-btn"><svg class="coquille-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="6" y="6" width="12" height="12" rx="2"/></svg> Arrêter</button>
     </div>
@@ -359,8 +359,8 @@ function coquille_revue_render_overlay() {
       <?php endif; ?>
       <p id="coquille-privacy"><?php if ($is_logged): ?>Votre suggestion est enregistrée avec votre nom de compte.<?php elseif ($ask_email): ?>Nom et e-mail facultatifs. L'e-mail sert uniquement à vous prévenir quand votre suggestion est appliquée, puis il est effacé.<?php else: ?>Nom facultatif.<?php endif; ?> L'adresse IP est conservée <?php echo (int) COQUILLE_REVUE_IP_RETENTION_DAYS; ?> jours contre le spam. Les suggestions peuvent être traitées avec un assistant IA.<?php if ($privacy): ?> <a href="<?php echo esc_url($privacy); ?>" target="_blank" rel="noopener noreferrer">Confidentialité<span class="coquille-sr-only"> (nouvel onglet)</span></a><?php endif; ?></p>
       <label class="coquille-sr-only" for="coquille-textarea">Votre suggestion</label>
-      <textarea id="coquille-textarea" placeholder="Votre suggestion…" aria-describedby="coquille-textarea-help" maxlength="<?php echo (int) COQUILLE_REVUE_MAX_TEXT_LENGTH; ?>"></textarea>
-      <p id="coquille-textarea-help">Entrée pour envoyer · Maj+Entrée pour aller à la ligne · Échap pour annuler</p>
+      <textarea id="coquille-textarea" placeholder="Votre suggestion…" aria-describedby="coquille-textarea-help" enterkeyhint="send" maxlength="<?php echo (int) COQUILLE_REVUE_MAX_TEXT_LENGTH; ?>"></textarea>
+      <p id="coquille-textarea-help"><span class="coquille-help-keys">Entrée pour envoyer · Maj+Entrée pour aller à la ligne · Échap pour annuler</span><span class="coquille-help-touch">Touche Entrée ou bouton « Envoyer » pour envoyer</span></p>
       <div id="coquille-type-row" role="group" aria-label="Type de remarque">
         <button type="button" class="coquille-type-btn" data-type="correction" aria-pressed="true"><svg class="coquille-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg> Correction</button>
         <button type="button" class="coquille-type-btn" data-type="suggestion" aria-pressed="false"><svg class="coquille-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M9 18h6"/><path d="M10 22h4"/><path d="M12 2a7 7 0 0 0-4 12.74V16h8v-1.26A7 7 0 0 0 12 2z"/></svg> Suggestion</button>

@@ -40,10 +40,14 @@
   let smartDrag = null;     // { x, y, isDrag } : clic-glisser en cours sur une zone sans texte
   let lastOverText = null;  // null = pas encore détecté
   let cursorThrottle = 0;
+  let lastPointerType = 'mouse'; // 'touch' : la sélection se fait au doigt (appui long, poignées)
 
   // Helpers pour le détecteur "sur du texte ou pas"
   function isPluginEl(el) {
     return !!(el && el.closest && el.closest('#coquille-revue-root'));
+  }
+  function nodeEl(node) {
+    return node && (node.nodeType === Node.ELEMENT_NODE ? node : node.parentElement);
   }
   function isTyping(el) {
     return !!(el && (el.isContentEditable || (el.closest && el.closest('input, textarea, select'))));
@@ -110,12 +114,42 @@
     return parts.join(' > ');
   }
 
-  function positionBubble(clientX) {
-    const bw = 340, vw = window.innerWidth;
-    let left = clientX + window.scrollX - bw / 2;
-    left = Math.max(16, Math.min(left, vw + window.scrollX - bw - 16));
-    bubble.style.left = left + 'px';
+  // Bulle fixée en bas de l'écran, au-dessus de la barre, centrée sur ce qui est annoté (rect : coordonnées
+  // à l'écran) ; en haut si elle le cacherait et qu'il y a la place au-dessus. À droite, le crayon reste visible.
+  function positionBubble(rect) {
+    const vw = window.innerWidth, vh = window.innerHeight;
+    const bw = bubble.offsetWidth, bh = bubble.offsetHeight;
+    const maxLeft = vw - bw - (vw > 600 ? 84 : 16);
+    bubble.style.left = Math.max(16, Math.min(rect.left + rect.width / 2 - bw / 2, maxLeft)) + 'px';
     bubble.style.right = 'auto';
+    bubble.classList.toggle('coquille-bubble-top', rect.bottom > vh - 56 - bh - 8 && rect.top > bh + 24);
+  }
+
+  // Clavier virtuel ouvert : la zone visible rétrécit sans que la page bouge ; la bulle se place juste au-dessus.
+  function fitBubbleToViewport() {
+    const vv = window.visualViewport;
+    if (!vv || !bubble.classList.contains('coquille-visible')) return;
+    const keyboard = Math.round(window.innerHeight - vv.height - vv.offsetTop);
+    if (keyboard > 80 && Math.abs(vv.scale - 1) < 0.01) {
+      bubble.classList.remove('coquille-bubble-top');
+      bubble.style.bottom = (keyboard + 8) + 'px';
+      bubble.style.maxHeight = (vv.height - 16) + 'px';
+    } else {
+      bubble.style.bottom = '';
+      bubble.style.maxHeight = '';
+    }
+  }
+  if (window.visualViewport) {
+    window.visualViewport.addEventListener('resize', fitBubbleToViewport);
+    window.visualViewport.addEventListener('scroll', fitBubbleToViewport);
+  }
+
+  // Au toucher, le champ ne prend pas le focus tout seul : le clavier cacherait la page et, sur iOS, effacerait la sélection.
+  function showBubble(rect, focusField) {
+    bubble.classList.add('coquille-visible');
+    positionBubble(rect);
+    fitBubbleToViewport();
+    if (focusField) setTimeout(() => textarea.focus({ preventScroll: true }), 60);
   }
 
   // Message annoncé par la zone role="status" ; le texte est vidé une fois le message masqué.
@@ -213,12 +247,15 @@
   stopBtn.addEventListener('click', () => exitReviewMode());
 
   // ── Capture sélection texte ──────────────────────────────────────────
-  function captureTextSelection(clientX) {
+  function captureTextSelection() {
     const sel = window.getSelection();
     if (!sel || sel.isCollapsed || sel.toString().trim().length < 2) return false;
 
     const range = sel.getRangeAt(0);
     const text  = sel.toString().trim();
+    const touch = lastPointerType === 'touch';
+    // Au toucher, ajuster les poignées met à jour la bulle déjà ouverte sans effacer la remarque.
+    const updating = touch && bubble.classList.contains('coquille-visible');
 
     currentAnnotation = {
       mode: 'text',
@@ -234,11 +271,9 @@
     origText.classList.remove('coquille-zone-preview');
     const preview = text.slice(0, 150) + (text.length > 150 ? '…' : '');
     origText.textContent = fmt(t.quoted, preview);
-    textarea.value = '';
+    if (!updating) textarea.value = '';
 
-    positionBubble(clientX);
-    bubble.classList.add('coquille-visible');
-    setTimeout(() => textarea.focus(), 60);
+    showBubble(range.getBoundingClientRect(), !touch);
     return true;
   }
 
@@ -278,9 +313,7 @@
       : currentAnnotation.cssSelector;
     textarea.value = '';
 
-    positionBubble(cx);
-    bubble.classList.add('coquille-visible');
-    setTimeout(() => textarea.focus(), 60);
+    showBubble({ left: x, top: y, width: w, height: h, bottom: y + h }, true);
   }
 
   // ── Logique unifiée : curseur intelligent + capture auto ─────────────
@@ -325,7 +358,7 @@
       autoSendOrClose();
       return;
     }
-    if (!reviewModeActive) return;
+    if (!reviewModeActive || lastPointerType === 'touch') return;
     if (isPluginEl(e.target)) return;
     // Si on clique sur du texte, on laisse le navigateur faire la sélection
     if (isOverText(e.clientX, e.clientY)) return;
@@ -335,7 +368,7 @@
   });
 
   document.addEventListener('mouseup', (e) => {
-    if (!reviewModeActive) return;
+    if (!reviewModeActive || lastPointerType === 'touch') return;
     if (isPluginEl(e.target)) { smartDrag = null; return; }
 
     // Cas 1 : on a fait un drag de zone
@@ -352,7 +385,7 @@
     smartDrag = null;
 
     // Cas 2 : pas de drag → on regarde si une sélection texte existe
-    captureTextSelection(e.clientX);
+    captureTextSelection();
   });
 
   // Intercepte tous les clics en mode revue pour bloquer la navigation
@@ -363,16 +396,17 @@
     e.stopPropagation();
   }, true);
 
-  // Tactile : on supporte uniquement la sélection texte
-  document.addEventListener('touchend', (e) => {
-    if (!reviewModeActive) return;
-    if (isPluginEl(e.target)) return;
-    setTimeout(() => {
+  // Tactile : sélection de texte seulement (appui long, puis poignées). La bulle s'ouvre ou se met à jour
+  // une fois la sélection stable ; les événements souris simulés après un toucher sont ignorés.
+  let selectionTimer = null;
+  document.addEventListener('pointerdown', (e) => { lastPointerType = e.pointerType || 'mouse'; }, true);
+  document.addEventListener('selectionchange', () => {
+    if (!reviewModeActive || lastPointerType !== 'touch') return;
+    clearTimeout(selectionTimer);
+    selectionTimer = setTimeout(() => {
       const sel = window.getSelection();
-      if (!sel || sel.isCollapsed) return;
-      const rect = sel.getRangeAt(0).getBoundingClientRect();
-      captureTextSelection(rect.left + rect.width / 2);
-    }, 100);
+      if (reviewModeActive && sel && sel.rangeCount && !isPluginEl(nodeEl(sel.anchorNode))) captureTextSelection();
+    }, 600);
   });
 
   // ── Type d'annotation ────────────────────────────────────────────────
@@ -471,10 +505,7 @@
     // Annotation au clavier : en mode relecture, une sélection faite au clavier (navigation au curseur, F7) puis Entrée.
     if (e.key === 'Enter' && reviewModeActive && !bubble.classList.contains('coquille-visible') && !isPluginEl(e.target) && !isTyping(e.target)) {
       const sel = window.getSelection();
-      if (sel && !sel.isCollapsed && !isPluginEl(sel.anchorNode && sel.anchorNode.parentElement)) {
-        const r = sel.getRangeAt(0).getBoundingClientRect();
-        if (captureTextSelection(r.left + r.width / 2)) e.preventDefault();
-      }
+      if (sel && !sel.isCollapsed && !isPluginEl(nodeEl(sel.anchorNode)) && captureTextSelection()) e.preventDefault();
     }
     // Alt+Maj+C (Option+Maj+C sur Mac, d'où e.code) : personnes connectées seulement, jamais pendant une saisie.
     if (cfg.shortcut && e.altKey && e.shiftKey && !e.ctrlKey && !e.metaKey && e.code === 'KeyC' && !isTyping(e.target)) {
