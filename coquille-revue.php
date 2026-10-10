@@ -238,6 +238,7 @@ add_action('coquille_revue_purge_personal_data', function () {
 // L'interface est-elle chargée sur cette page ? La vraie barrière reste la permission de l'API.
 function coquille_revue_overlay_enabled() {
     if (coquille_revue_is_login_required() && !current_user_can('edit_posts')) return false;
+    if (is_customize_preview()) return false;
     return (bool) apply_filters('coquille_revue_load_overlay', true);
 }
 
@@ -271,6 +272,7 @@ add_action('wp_enqueue_scripts', function () {
     $config = [
         'restUrl'    => rest_url('coquille-revue/v1/annotation'),
         'nonce'      => $is_logged ? wp_create_nonce('wp_rest') : '',
+        'shortcut'   => $is_logged, // Alt+Maj+C : jamais pour les visiteurs anonymes
         'maxLengths' => COQUILLE_REVUE_MAX_LENGTHS + ['originalText' => COQUILLE_REVUE_MAX_TEXT_LENGTH, 'suggestion' => COQUILLE_REVUE_MAX_TEXT_LENGTH],
         'i18n'       => coquille_revue_overlay_strings(),
     ];
@@ -296,7 +298,7 @@ function coquille_revue_render_overlay() {
     <div id="coquille-zone-highlight"></div>
 
     <!-- Icône flottante toujours visible (crayon) -->
-    <button id="coquille-fab" title="Aide-nous à améliorer cette page" aria-label="Mode relecture">
+    <button id="coquille-fab" title="Aide-nous à améliorer cette page<?php echo $is_logged ? ' (Alt+Maj+C)' : ''; ?>" aria-label="Mode relecture"<?php echo $is_logged ? ' aria-keyshortcuts="Alt+Shift+C"' : ''; ?>>
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
         <path d="M12 20h9"/>
         <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>
@@ -445,7 +447,6 @@ function coquille_revue_annotation_args() {
         'originalText'    => $text(true, 'sanitize_textarea_field', COQUILLE_REVUE_MAX_TEXT_LENGTH),
         'suggestion'      => $text(true, 'sanitize_textarea_field', COQUILLE_REVUE_MAX_TEXT_LENGTH),
         'type'            => $text(false, 'sanitize_text_field', 32) + ['enum' => ['correction', 'suggestion', 'question']],
-        'platform'        => $text(false, 'sanitize_text_field', 32),
         'annotationMode'  => $text(false, 'sanitize_text_field', 16) + ['enum' => ['text', 'zone']],
         'zoneData'        => ['required' => false, 'type' => ['object', 'null'], 'validate_callback' => 'rest_validate_request_arg'],
         'reviewerName'    => $text(false, 'sanitize_text_field', $max['reviewerName']),

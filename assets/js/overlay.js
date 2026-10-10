@@ -19,7 +19,6 @@
   const fab          = document.getElementById('coquille-fab');
   const infoPop      = document.getElementById('coquille-info-popover');
   const infoStartBtn = document.getElementById('coquille-info-start');
-  const bar          = document.getElementById('coquille-bar');
   const stopBtn      = document.getElementById('coquille-stop-btn');
   const bubble       = document.getElementById('coquille-bubble');
   const bubbleTitle  = document.getElementById('coquille-bubble-title');
@@ -37,10 +36,16 @@
   let reviewModeActive = false;
   let currentAnnotation = null;
   let activeType = 'correction';
+  let smartDrag = null;     // { x, y, isDrag } : clic-glisser en cours sur une zone sans texte
+  let lastOverText = null;  // null = pas encore détecté
+  let cursorThrottle = 0;
 
   // Helpers pour le détecteur "sur du texte ou pas"
   function isPluginEl(el) {
     return !!(el && el.closest && el.closest('#coquille-revue-root'));
+  }
+  function isTyping(el) {
+    return !!(el && (el.isContentEditable || (el.closest && el.closest('input, textarea, select'))));
   }
   function isOverText(x, y) {
     let range = null, offset = 0;
@@ -95,7 +100,7 @@
       let sel = node.tagName.toLowerCase();
       if (node.id) { parts.unshift('#' + node.id); break; }
       if (node.className && typeof node.className === 'string') {
-        const cls = [...node.classList].filter(c => !/^coquille-(mode-active|cursor-text|cursor-zone|zone-preview|drawing|active|visible|invalid|show|success|error)$/.test(c)).slice(0,2).join('.');
+        const cls = [...node.classList].filter(c => !c.startsWith('coquille-')).slice(0, 2).join('.');
         if (cls) sel += '.' + cls;
       }
       parts.unshift(sel);
@@ -128,6 +133,7 @@
 
   function enterReviewMode() {
     reviewModeActive = true;
+    lastOverText = null;
     document.body.classList.add('coquille-mode-active', 'coquille-cursor-text');
     fab.classList.add('coquille-active');
     infoPop.classList.remove('coquille-visible');
@@ -187,7 +193,6 @@
       charOffsetStart: range.startOffset,
       charOffsetEnd: range.endOffset,
       originalText: text,
-      platform: 'wordpress',
     };
 
     bubbleTitle.textContent = t.textSelected;
@@ -223,7 +228,6 @@
       cssSelector: getCssSelector(elBehind),
       charOffsetStart: 0, charOffsetEnd: 0,
       originalText: elText || '(zone sans texte direct)',
-      platform: 'wordpress',
       zoneData: {
         x: Math.round(x + window.scrollX), y: Math.round(y + window.scrollY),
         w: Math.round(w), h: Math.round(h),
@@ -245,10 +249,6 @@
   }
 
   // ── Logique unifiée : curseur intelligent + capture auto ─────────────
-  let smartDrag = null;     // { x, y, isDrag }
-  let lastOverText = null;  // null = pas encore détecté
-  let cursorThrottle = 0;
-
   function updateCursorAt(x, y) {
     const el = document.elementFromPoint(x, y);
     if (isPluginEl(el)) return; // ne pas toucher au curseur dans notre UI
@@ -284,6 +284,12 @@
   });
 
   document.addEventListener('mousedown', (e) => {
+    // Clic hors de la bulle ouverte : envoi automatique si une remarque est saisie, sinon fermeture.
+    // Aucune nouvelle zone ne démarre : la remarque en cours n'est jamais perdue.
+    if (bubble.classList.contains('coquille-visible') && !isPluginEl(e.target)) {
+      autoSendOrClose();
+      return;
+    }
     if (!reviewModeActive) return;
     if (isPluginEl(e.target)) return;
     // Si on clique sur du texte, on laisse le navigateur faire la sélection
@@ -358,7 +364,7 @@
       xpath: cut(currentAnnotation.xpath, max.xpath), cssSelector: cut(currentAnnotation.cssSelector, max.cssSelector),
       charOffsetStart: currentAnnotation.charOffsetStart, charOffsetEnd: currentAnnotation.charOffsetEnd,
       originalText: cut(currentAnnotation.originalText, max.originalText), suggestion: textarea.value.trim(),
-      type: activeType, platform: currentAnnotation.platform,
+      type: activeType,
       annotationMode: currentAnnotation.mode, zoneData: currentAnnotation.zoneData || null,
       // Champs vides omis : le serveur n'a rien à nettoyer
       reviewerName: reviewerName?.value.trim() || undefined,
@@ -421,7 +427,8 @@
       else if (reviewModeActive) exitReviewMode();
       else if (infoPop.classList.contains('coquille-visible')) infoPop.classList.remove('coquille-visible');
     }
-    if (e.ctrlKey && e.shiftKey && e.key === 'R') {
+    // Alt+Maj+C (Option+Maj+C sur Mac, d'où e.code) : personnes connectées seulement, jamais pendant une saisie.
+    if (cfg.shortcut && e.altKey && e.shiftKey && !e.ctrlKey && !e.metaKey && e.code === 'KeyC' && !isTyping(e.target)) {
       e.preventDefault();
       reviewModeActive ? exitReviewMode() : enterReviewMode();
     }
@@ -435,15 +442,5 @@
       closeBubble();
     }
   }
-
-  // Clic en dehors → tentative d'auto-envoi
-  document.addEventListener('mousedown', (e) => {
-    if (smartDrag) return;
-    if (bubble.classList.contains('coquille-visible') &&
-        !bubble.contains(e.target) && !bar.contains(e.target) &&
-        !infoPop.contains(e.target) && !fab.contains(e.target)) {
-      autoSendOrClose();
-    }
-  });
 
 })();

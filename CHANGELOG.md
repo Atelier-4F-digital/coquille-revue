@@ -6,6 +6,8 @@ Toutes les évolutions notables de Coquille Revue. Format inspiré de [Keep a Ch
 
 ### Changements incompatibles
 
+- Raccourci clavier : Ctrl+Maj+R (le rechargement forcé du navigateur) n'est plus détourné. Le mode relecture s'ouvre et se ferme avec **Alt+Maj+C** (Option+Maj+C sur Mac), pour les personnes connectées seulement, et jamais pendant une saisie dans un champ.
+- API REST : le champ `platform`, ignoré par le serveur, n'est plus déclaré ni envoyé par le script (un ancien script qui l'envoie encore est accepté).
 - API REST : chaque champ est validé (type, longueur, valeurs permises) avant d'être nettoyé. Une valeur du mauvais type (un tableau à la place d'un texte, par exemple) reçoit une erreur 400 au lieu de faire planter PHP ; un champ trop long reçoit 400 et non plus 413. Le texte d'origine et la suggestion doivent faire au moins 2 caractères.
 - API REST : `PATCH /annotation/{id}/status` exige le paramètre `status` (il valait `applied` par défaut). `GET /annotations` est paginé : `per_page` (100 au plus, 100 par défaut) et `page`, total dans les en-têtes `X-WP-Total` et `X-WP-TotalPages`.
 - WP-CLI : `apply --type=option` ne modifie plus que des options de texte du site : `blogname`, `blogdescription`, `widget_*`, `theme_mods_*`, `options_*` (ACF), liste extensible avec le filtre `coquille_revue_cli_writable_options`. `locate` indique pour chaque option si elle est `modifiable`. `locate` et `apply` refusent un texte d'origine de moins de 2 caractères.
@@ -20,6 +22,7 @@ Toutes les évolutions notables de Coquille Revue. Format inspiré de [Keep a Ch
 
 ### Modifications
 
+- Interface publique : plus chargée dans l'aperçu du Customizer. Le clic-glisser hors de la bulle ouverte envoie la remarque saisie (ou ferme la bulle) au lieu de démarrer une nouvelle zone qui effaçait cette remarque ; le curseur est recalculé à chaque entrée dans le mode relecture.
 - Crédit public masqué par défaut : plus de lien « plugin par Atelier 4F Digital » dans la barre de relecture des visiteurs, ni de commentaire HTML avec le nom et la version de l'extension dans les pages. Le crédit reste dans la page d'admin, les exports et les README.
 - Interface publique : le CSS et le JavaScript ne sont plus écrits dans chaque page. WordPress les charge depuis `assets/css/overlay.css` et `assets/js/overlay.js` (script en pied de page, en `defer`), avec la version de l'extension en `?ver=`. La configuration (adresse de l'API, jeton, longueurs maximales, textes) est passée dans `window.coquilleRevueConfig`. Rien n'est chargé quand l'interface ne s'affiche pas (mode privé et visiteur non connecté). Avec une règle CSP stricte, seule cette configuration écrite dans la page a besoin d'un nonce (filtre `wp_inline_script_attributes`). Après une mise à jour, vider le cache de page ; si un outil d'optimisation retarde ou fusionne les scripts, en exclure `coquille-revue`.
 - Page d'admin : styles dans `assets/css/admin.css`, chargé seulement sur la page Coquille Revue (plus aucun attribut `style`). Couleurs des statuts plus foncées, pour un contraste d'au moins 4,5:1 ; icônes de WordPress (dashicons) à la place des emojis ; tout le texte est échappé au moment de l'affichage.
