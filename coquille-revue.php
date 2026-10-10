@@ -1,21 +1,22 @@
 <?php
 /**
- * Plugin Name: Coquille Revue
- * Plugin URI:  https://github.com/Atelier-4F-digital/coquille-revue
- * Description: Relecture de contenu directement sur les pages : icône flottante, sélection de texte ou de zone, suggestions enregistrées dans WordPress. Réservé aux utilisateurs connectés par défaut, mode public (visiteurs, avec anti-spam) activable depuis la page d'admin. E-mail de remerciement au contributeur quand sa suggestion est appliquée. Export CSV/JSON/Markdown. Application des corrections avec Claude Code (/coquille-revue:apply-review).
- * Version:     2.6.0-dev
- * Author:      Atelier 4F Digital
- * Author URI:  https://atelier4fdigital.com
- * Text Domain: coquille-revue
- * License:     GPL-2.0-or-later
- * License URI: https://www.gnu.org/licenses/gpl-2.0.html
+ * Plugin Name:       Coquille Revue
+ * Plugin URI:        https://github.com/Atelier-4F-digital/coquille-revue
+ * Description:       On-page content review: highlight text or frame an area, leave a correction, suggestion or question, stored in WordPress.
+ * Version:           2.6.0
  * Requires at least: 6.2
- * Requires PHP: 7.4
+ * Requires PHP:      7.4
+ * Author:            Atelier 4F Digital
+ * Author URI:        https://atelier4fdigital.com
+ * License:           GPL-2.0-or-later
+ * License URI:       https://www.gnu.org/licenses/gpl-2.0.html
+ * Text Domain:       coquille-revue
+ * Domain Path:       /languages
  */
 
 defined('ABSPATH') || exit;
 
-const COQUILLE_REVUE_VERSION    = '2.6.0-dev';
+const COQUILLE_REVUE_VERSION    = '2.6.0';
 const COQUILLE_REVUE_DB_VERSION = '3';
 const COQUILLE_REVUE_AUTHOR_URL = 'https://atelier4fdigital.com';
 const COQUILLE_REVUE_AUTHOR     = 'Atelier 4F Digital';

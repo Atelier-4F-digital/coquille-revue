@@ -21,6 +21,7 @@ Toutes les évolutions notables de Coquille Revue. Format inspiré de [Keep a Ch
 - Réglage par site « Crédit » (désactivé par défaut), réservé aux administrateurs du site : affiche « Coquille Revue, proposé par Atelier 4F Digital » et un lien dans la fenêtre d'information du crayon. Les deux réglages du site (remerciement et crédit) sont enregistrés par un seul formulaire.
 - Filtre `coquille_revue_load_overlay` (booléen) : renvoyer `false` pour ne pas charger l'interface de relecture sur une page.
 - Désinstallation : supprimer l'extension depuis l'écran Extensions efface la table des annotations, les réglages et les tâches planifiées, sur chaque site du réseau (`uninstall.php`). La simple désactivation garde tout.
+- `readme.txt` en anglais pour le répertoire WordPress.org (description, confidentialité, FAQ, journal des versions) et dossier `languages/` déclaré dans l'en-tête (`Domain Path`).
 
 ### Modifications
 
@@ -32,6 +33,7 @@ Toutes les évolutions notables de Coquille Revue. Format inspiré de [Keep a Ch
 - Interface publique : le CSS et le JavaScript ne sont plus écrits dans chaque page. WordPress les charge depuis `assets/css/overlay.css` et `assets/js/overlay.js` (script en pied de page, en `defer`), avec la version de l'extension en `?ver=`. La configuration (adresse de l'API, jeton, longueurs maximales, textes) est passée dans `window.coquilleRevueConfig`. Rien n'est chargé quand l'interface ne s'affiche pas (mode privé et visiteur non connecté). Avec une règle CSP stricte, seule cette configuration écrite dans la page a besoin d'un nonce (filtre `wp_inline_script_attributes`). Après une mise à jour, vider le cache de page ; si un outil d'optimisation retarde ou fusionne les scripts, en exclure `coquille-revue`.
 - Page d'admin : styles dans `assets/css/admin.css`, chargé seulement sur la page Coquille Revue (plus aucun attribut `style`). Couleurs des statuts plus foncées, pour un contraste d'au moins 4,5:1 ; icônes de WordPress (dashicons) à la place des emojis ; tout le texte est échappé au moment de l'affichage.
 - Page d'admin : la confirmation avant « Appliqué » passe par un attribut `data-coquille-confirm` et un petit script chargé par WordPress, au lieu d'un attribut `onclick`. Les liens de changement de statut d'une page ouverte avant la mise à jour ne marchent plus (« Le lien a expiré ») : recharger la page.
+- En-tête de l'extension en anglais, aux normes de WordPress.org (description courte, `Requires at least`, `Domain Path`).
 - Alertes : les points de code (U+XXXX) des caractères invisibles et des alphabets mélangés sont calculés sans l'extension PHP mbstring, que WordPress n'exige pas.
 
 ### Sécurité
