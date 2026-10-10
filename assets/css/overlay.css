@@ -1,0 +1,198 @@
+/* Coquille Revue — interface publique. Tout est rangé dans #coquille-revue-root (sans position ni transform :
+   la surbrillance de zone, en position absolue, se place par rapport au document). */
+#coquille-revue-root, #coquille-revue-root *
+{box-sizing:border-box;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif!important}
+
+/* ── Icône flottante (FAB) — crayon SVG ── */
+#coquille-fab{
+  position:fixed;bottom:24px;right:24px;z-index:2147483640;
+  width:52px;height:52px;border-radius:50%;
+  background:#111;border:1px solid #2a2a2a;
+  display:flex;align-items:center;justify-content:center;
+  cursor:pointer;color:#facc15;
+  box-shadow:0 10px 32px rgba(0,0,0,.35);
+  transition:transform .15s, box-shadow .15s, background .15s;
+}
+#coquille-fab:hover{transform:translateY(-2px);box-shadow:0 14px 36px rgba(0,0,0,.45)}
+#coquille-fab.coquille-active{background:#facc15;color:#111;border-color:#facc15}
+#coquille-fab svg{width:24px;height:24px;display:block}
+
+/* ── Popover info ── */
+#coquille-info-popover{
+  position:fixed;bottom:88px;right:24px;z-index:2147483641;
+  width:300px;background:#fff;border-radius:14px;padding:18px;
+  box-shadow:0 20px 60px rgba(0,0,0,.22);
+  display:none;flex-direction:column;gap:10px;color:#1f2937;
+  transform-origin:bottom right;
+  animation:coquille-pop .18s ease-out;
+}
+#coquille-info-popover.coquille-visible{display:flex}
+@keyframes coquille-pop{from{opacity:0;transform:scale(.94) translateY(6px)}to{opacity:1;transform:scale(1) translateY(0)}}
+
+#coquille-info-popover h3{
+  margin:0;font-size:15px;font-weight:600;display:flex;align-items:center;gap:8px;
+}
+#coquille-info-popover p{margin:0;font-size:13px;line-height:1.5;color:#4b5563}
+#coquille-info-popover .coquille-info-cta{
+  background:#111;color:#fff;border:none;border-radius:8px;
+  padding:9px 14px;font-size:13px;font-weight:600;cursor:pointer;
+  transition:background .15s;
+}
+#coquille-info-popover .coquille-info-cta:hover{background:#333}
+#coquille-info-popover .coquille-info-credit{
+  margin-top:4px;padding-top:10px;border-top:1px solid #e5e7eb;
+  font-size:11px;color:#6b7280;text-align:center;
+}
+#coquille-info-popover .coquille-info-credit a{color:#3b5bff;text-decoration:none;font-weight:600}
+#coquille-info-popover .coquille-info-credit a:hover{text-decoration:underline}
+
+/* ── Barre de contrôles (visible uniquement en mode actif) ── */
+#coquille-bar{
+  position:fixed;bottom:0;left:0;right:0;z-index:2147483640;
+  background:#111;border-top:1px solid #222;
+  display:none;align-items:center;gap:12px;padding:0 20px;height:48px;
+  box-shadow:0 -4px 24px rgba(0,0,0,.4);
+  transform:translateY(100%);transition:transform .25s;
+}
+body.coquille-mode-active #coquille-bar{display:flex;transform:translateY(0)}
+
+.coquille-dot{width:8px;height:8px;border-radius:50%;background:#22c55e;flex-shrink:0;animation:coquille-pulse 2s infinite}
+@keyframes coquille-pulse{0%,100%{opacity:1}50%{opacity:.3}}
+
+#coquille-label{color:#aaa;font-size:13px;font-weight:500;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#coquille-label strong{color:#f0f0f0}
+#coquille-label a{color:#facc15;text-decoration:none}
+#coquille-label a:hover{text-decoration:underline}
+
+#coquille-hint{
+  color:#666;font-size:11px;font-style:italic;
+  display:flex;gap:6px;align-items:center;
+}
+#coquille-hint kbd{
+  background:#1a1a1a;border:1px solid #333;border-radius:4px;
+  padding:1px 6px;font-size:10px;color:#aaa;font-family:ui-monospace,monospace;
+}
+
+#coquille-stop-btn{
+  background:transparent;border:1px solid #333;color:#ccc;
+  border-radius:8px;padding:6px 14px;font-size:13px;font-weight:500;cursor:pointer;transition:all .15s;
+}
+#coquille-stop-btn:hover{background:#222;color:#fff}
+
+/* ── Bulle d'annotation ── */
+#coquille-bubble{
+  position:absolute;z-index:2147483645;
+  background:#111;border:1px solid #2a2a2a;border-radius:14px;
+  padding:16px;width:340px;
+  box-shadow:0 16px 48px rgba(0,0,0,.6);
+  display:none;flex-direction:column;gap:10px;
+  bottom:56px;
+}
+#coquille-bubble.coquille-visible{display:flex}
+
+#coquille-bubble-header{display:flex;align-items:center;justify-content:space-between;font-size:12px;color:#666}
+#coquille-bubble-header span{color:#aaa;font-weight:500}
+#coquille-bubble-close{background:none;border:none;color:#555;font-size:16px;cursor:pointer;padding:0;line-height:1}
+#coquille-bubble-close:hover{color:#aaa}
+
+#coquille-original-text{
+  font-size:12px;color:#777;background:#1a1a1a;
+  border-left:2px solid #333;padding:8px 10px;border-radius:6px;line-height:1.5;
+  display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;
+}
+#coquille-original-text.coquille-zone-preview{
+  border-left-color:#facc15;color:#aaa;font-family:ui-monospace,Menlo,monospace;font-size:11px;
+}
+
+#coquille-textarea, #coquille-reviewer-name, #coquille-reviewer-email{
+  background:#1a1a1a;border:1px solid #2a2a2a;border-radius:8px;
+  color:#f0f0f0;font-size:13px;line-height:1.5;
+  padding:10px 12px;width:100%;outline:none;transition:border-color .15s;font-family:inherit;
+}
+#coquille-textarea{resize:vertical;min-height:80px}
+#coquille-textarea:focus, #coquille-reviewer-name:focus, #coquille-reviewer-email:focus{border-color:#444}
+#coquille-textarea::placeholder, #coquille-reviewer-name::placeholder, #coquille-reviewer-email::placeholder{color:#444}
+#coquille-reviewer-email.coquille-invalid{border-color:#ef4444}
+
+#coquille-reviewer-row{display:flex;flex-direction:column;gap:8px}
+#coquille-privacy{margin:0;font-size:11px;line-height:1.4;color:#94a3b8}
+#coquille-privacy a{color:inherit;text-decoration:underline}
+
+#coquille-type-row{display:flex;gap:6px}
+.coquille-type-btn{
+  flex:1;padding:5px 0;border-radius:6px;border:1px solid #222;
+  background:#1a1a1a;color:#666;font-size:11px;cursor:pointer;
+  transition:all .15s;text-align:center;
+}
+.coquille-type-btn.coquille-active{background:#222;color:#f0f0f0;border-color:#444}
+
+#coquille-actions{display:flex;gap:8px}
+#coquille-send-btn{
+  flex:1;background:#facc15;color:#111;border:none;
+  border-radius:8px;padding:9px;font-size:13px;font-weight:600;cursor:pointer;transition:background .15s;
+}
+#coquille-send-btn:hover{background:#fde047}
+#coquille-send-btn:disabled{background:#222;color:#555;cursor:default}
+#coquille-cancel-btn{background:transparent;border:1px solid #222;color:#666;border-radius:8px;padding:9px 14px;font-size:13px;cursor:pointer}
+#coquille-cancel-btn:hover{border-color:#333;color:#aaa}
+
+/* Honeypot (champ caché anti-bot) */
+#coquille-hp{position:absolute;left:-9999px;width:1px;height:1px;opacity:0;pointer-events:none}
+
+/* ── Toast ── */
+#coquille-toast{
+  position:fixed;bottom:90px;right:24px;z-index:2147483646;
+  background:#111;border:1px solid #2a2a2a;border-radius:10px;
+  padding:10px 16px;font-size:13px;color:#f0f0f0;
+  opacity:0;pointer-events:none;
+  transition:opacity .25s,transform .25s;transform:translateY(8px);
+}
+#coquille-toast.coquille-show{opacity:1;transform:translateY(0)}
+#coquille-toast.coquille-success{border-color:#22c55e;color:#22c55e}
+#coquille-toast.coquille-error{border-color:#ef4444;color:#ef4444}
+
+/* ── GEL DE PAGE en mode revue ── */
+#coquille-page-dim{
+  position:fixed;inset:0;z-index:2147483630;
+  background:rgba(10,10,15,.18);pointer-events:none;display:none;
+}
+body.coquille-mode-active #coquille-page-dim{display:block}
+
+/* En mode revue, on garde tout sélectionnable (texte dans les liens compris),
+   mais on intercepte les clics via JS pour bloquer la navigation. */
+body.coquille-mode-active ::selection{background:rgba(250,204,21,.35)}
+
+/* Curseur intelligent : I-beam sur du texte, crosshair sur les zones vides */
+body.coquille-mode-active.coquille-cursor-text, body.coquille-mode-active.coquille-cursor-text *{cursor:text !important}
+body.coquille-mode-active.coquille-cursor-zone, body.coquille-mode-active.coquille-cursor-zone *{cursor:crosshair !important}
+/* L'UI du plugin garde toujours son propre curseur */
+body.coquille-mode-active #coquille-fab, body.coquille-mode-active #coquille-fab *{cursor:pointer !important}
+body.coquille-mode-active #coquille-bar, body.coquille-mode-active #coquille-bar *,
+body.coquille-mode-active #coquille-bubble, body.coquille-mode-active #coquille-bubble *,
+body.coquille-mode-active #coquille-info-popover, body.coquille-mode-active #coquille-info-popover *{cursor:auto !important}
+body.coquille-mode-active #coquille-textarea, body.coquille-mode-active #coquille-reviewer-name{cursor:text !important}
+body.coquille-mode-active #coquille-send-btn, body.coquille-mode-active #coquille-cancel-btn,
+body.coquille-mode-active .coquille-type-btn, body.coquille-mode-active #coquille-stop-btn,
+body.coquille-mode-active #coquille-bubble-close{cursor:pointer !important}
+
+#coquille-zone-rect{
+  position:fixed;z-index:2147483636;
+  border:2px dashed #facc15;background:rgba(250,204,21,.15);
+  pointer-events:none;display:none;
+}
+#coquille-zone-rect.coquille-drawing{display:block}
+
+#coquille-zone-highlight{
+  position:absolute;z-index:2147483637;
+  border:2px solid #facc15;background:rgba(250,204,21,.10);
+  box-shadow:0 0 0 9999px rgba(10,10,15,.35);
+  pointer-events:none;display:none;border-radius:2px;
+}
+#coquille-zone-highlight.coquille-visible{display:block}
+
+@media(max-width:600px){
+  #coquille-info-popover{width:calc(100vw - 32px);right:16px}
+  #coquille-bubble{width:calc(100vw - 32px);left:16px;right:16px}
+  #coquille-label{display:none}
+  #coquille-fab{bottom:16px;right:16px}
+}

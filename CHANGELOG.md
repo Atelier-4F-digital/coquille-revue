@@ -15,6 +15,11 @@ Toutes les évolutions notables de Coquille Revue. Format inspiré de [Keep a Ch
 
 - Réglage par site « E-mail de remerciement » (activé par défaut), dans la page d'admin, réservé aux administrateurs du site. Coupé, l'e-mail n'est plus demandé aux visiteurs ni enregistré, et les textes de confidentialité sont adaptés. Filtre `coquille_revue_notify_contributor` (`$enabled`, `$row`) pour décider annotation par annotation.
 - Page d'admin : 50 annotations par page avec pagination, colonne « Alertes » (les mêmes que dans les exports pour Claude Code), texte complet du texte d'origine et de la suggestion au survol, confirmation avant « Appliqué » quand un remerciement va partir.
+- Filtre `coquille_revue_load_overlay` (booléen) : renvoyer `false` pour ne pas charger l'interface de relecture sur une page.
+
+### Modifications
+
+- Interface publique : le CSS et le JavaScript ne sont plus écrits dans chaque page. WordPress les charge depuis `assets/css/overlay.css` et `assets/js/overlay.js` (script en pied de page, en `defer`), avec la version de l'extension en `?ver=`. La configuration (adresse de l'API, jeton, longueurs maximales, textes) est passée dans `window.coquilleRevueConfig`. Rien n'est chargé quand l'interface ne s'affiche pas (mode privé et visiteur non connecté). Avec une règle CSP stricte, seule cette configuration écrite dans la page a besoin d'un nonce (filtre `wp_inline_script_attributes`). Après une mise à jour, vider le cache de page ; si un outil d'optimisation retarde ou fusionne les scripts, en exclure `coquille-revue`.
 
 ### Sécurité
 

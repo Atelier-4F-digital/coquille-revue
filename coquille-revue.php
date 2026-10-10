@@ -3,7 +3,7 @@
  * Plugin Name: Coquille Revue
  * Plugin URI:  https://github.com/Atelier-4F-digital/coquille-revue
  * Description: Relecture de contenu directement sur les pages : icône flottante, sélection de texte ou de zone, suggestions enregistrées dans WordPress. Réservé aux utilisateurs connectés par défaut, mode public (visiteurs, avec anti-spam) activable depuis la page d'admin. E-mail de remerciement au contributeur quand sa suggestion est appliquée. Export CSV/JSON/Markdown. Application des corrections avec Claude Code (/coquille-revue:apply-review).
- * Version:     2.5.0
+ * Version:     2.6.0-dev
  * Author:      Atelier 4F Digital
  * Author URI:  https://atelier4fdigital.com
  * Text Domain: coquille-revue
@@ -15,7 +15,7 @@
 
 defined('ABSPATH') || exit;
 
-const COQUILLE_REVUE_VERSION    = '2.5.0';
+const COQUILLE_REVUE_VERSION    = '2.6.0-dev';
 const COQUILLE_REVUE_DB_VERSION = '3';
 const COQUILLE_REVUE_AUTHOR_URL = 'https://atelier4fdigital.com';
 const COQUILLE_REVUE_AUTHOR     = 'Atelier 4F Digital';
@@ -227,229 +227,66 @@ add_action('coquille_revue_purge_personal_data', function () {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// INJECTION FRONT-END — icône flottante toujours visible
+// INTERFACE PUBLIQUE — icône flottante, barre et bulle (assets/css/overlay.css, assets/js/overlay.js)
 // ─────────────────────────────────────────────────────────────────────────────
 
-add_action('wp_footer', 'coquille_revue_inject_review_ui');
+// L'interface est-elle chargée sur cette page ? La vraie barrière reste la permission de l'API.
+function coquille_revue_overlay_enabled() {
+    if (coquille_revue_is_login_required() && !current_user_can('edit_posts')) return false;
+    return (bool) apply_filters('coquille_revue_load_overlay', true);
+}
 
-function coquille_revue_inject_review_ui() {
-    if (is_admin()) return;
+// Textes du script, passés par la configuration (aucun texte n'est écrit dans overlay.js).
+function coquille_revue_overlay_strings() {
+    return [
+        'textSelected'       => 'Texte sélectionné',
+        'zoneSelected'       => 'Zone sélectionnée (%1$s×%2$s)',
+        'quoted'             => '« %s »',
+        'zonePreview'        => '%1$s — « %2$s »',
+        'send'               => 'Envoyer',
+        'sending'            => 'Envoi…',
+        'sent'               => 'Merci, votre suggestion a été envoyée',
+        'errorTooLong'       => 'Votre texte est trop long.',
+        'errorRateLimited'   => 'Trop d’envois pour le moment, réessayez dans quelques minutes.',
+        'errorLoginRequired' => 'Connectez-vous pour proposer une correction.',
+        'errorForbidden'     => 'Vous n’avez pas les droits pour proposer une correction.',
+        'errorGeneric'       => 'Envoi impossible (erreur %s).',
+    ];
+}
 
-    // Si auth obligatoire, on n'injecte rien pour les anonymes
+add_action('wp_enqueue_scripts', function () {
+    if (!coquille_revue_overlay_enabled()) return;
+    $assets    = plugin_dir_url(__FILE__) . 'assets/';
     $is_logged = is_user_logged_in();
-    if (coquille_revue_is_login_required() && !$is_logged) return;
-    if (coquille_revue_is_login_required() && !current_user_can('edit_posts')) return;
+    wp_enqueue_style('coquille-revue-overlay', $assets . 'css/overlay.css', [], COQUILLE_REVUE_VERSION);
+    wp_enqueue_script('coquille-revue-overlay', $assets . 'js/overlay.js', [], COQUILLE_REVUE_VERSION, ['in_footer' => true, 'strategy' => 'defer']);
 
     // Jeton REST seulement pour les personnes connectées : pour un anonyme il ne protège rien
     // et, servi depuis un cache de page périmé, il ferait refuser l'envoi.
-    $nonce     = $is_logged ? wp_create_nonce('wp_rest') : '';
-    $api_root  = esc_js(rest_url('coquille-revue/v1'));
+    $config = [
+        'restUrl'    => rest_url('coquille-revue/v1/annotation'),
+        'nonce'      => $is_logged ? wp_create_nonce('wp_rest') : '',
+        'maxLengths' => COQUILLE_REVUE_MAX_LENGTHS + ['originalText' => COQUILLE_REVUE_MAX_TEXT_LENGTH, 'suggestion' => COQUILLE_REVUE_MAX_TEXT_LENGTH],
+        'i18n'       => coquille_revue_overlay_strings(),
+    ];
+    wp_add_inline_script('coquille-revue-overlay', 'window.coquilleRevueConfig = ' . wp_json_encode($config, JSON_HEX_TAG | JSON_UNESCAPED_UNICODE) . ';', 'before');
+});
+
+// Priorité 10 : le HTML passe avant les scripts du pied de page (priorité 20). Rien n'est imprimé si le script
+// n'a pas été chargé : une seule condition d'affichage, celle de coquille_revue_overlay_enabled().
+add_action('wp_footer', 'coquille_revue_render_overlay');
+
+function coquille_revue_render_overlay() {
+    if (!wp_script_is('coquille-revue-overlay', 'enqueued')) return;
+
+    $is_logged = is_user_logged_in();
     $user_name = $is_logged ? wp_get_current_user()->display_name : '';
     $privacy   = get_privacy_policy_url();
     $ask_email = coquille_revue_thanks_enabled();
-
+    $max       = COQUILLE_REVUE_MAX_LENGTHS;
     ?>
-    <!-- Coquille Revue Plugin v<?php echo COQUILLE_REVUE_VERSION; ?> · <?php echo esc_html(COQUILLE_REVUE_AUTHOR); ?> -->
-    <style id="coquille-styles">
-      #coquille-fab, #coquille-info-popover, #coquille-bar, #coquille-bubble, #coquille-zone-overlay,
-      #coquille-fab *, #coquille-info-popover *, #coquille-bar *, #coquille-bubble *, #coquille-zone-overlay *
-      {box-sizing:border-box;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif!important}
-
-      /* ── Icône flottante (FAB) — crayon SVG ── */
-      #coquille-fab{
-        position:fixed;bottom:24px;right:24px;z-index:2147483640;
-        width:52px;height:52px;border-radius:50%;
-        background:#111;border:1px solid #2a2a2a;
-        display:flex;align-items:center;justify-content:center;
-        cursor:pointer;color:#facc15;
-        box-shadow:0 10px 32px rgba(0,0,0,.35);
-        transition:transform .15s, box-shadow .15s, background .15s;
-      }
-      #coquille-fab:hover{transform:translateY(-2px);box-shadow:0 14px 36px rgba(0,0,0,.45)}
-      #coquille-fab.coquille-active{background:#facc15;color:#111;border-color:#facc15}
-      #coquille-fab svg{width:24px;height:24px;display:block}
-
-      /* ── Popover info ── */
-      #coquille-info-popover{
-        position:fixed;bottom:88px;right:24px;z-index:2147483641;
-        width:300px;background:#fff;border-radius:14px;padding:18px;
-        box-shadow:0 20px 60px rgba(0,0,0,.22);
-        display:none;flex-direction:column;gap:10px;color:#1f2937;
-        transform-origin:bottom right;
-        animation:coquille-pop .18s ease-out;
-      }
-      #coquille-info-popover.coquille-visible{display:flex}
-      @keyframes coquille-pop{from{opacity:0;transform:scale(.94) translateY(6px)}to{opacity:1;transform:scale(1) translateY(0)}}
-
-      #coquille-info-popover h3{
-        margin:0;font-size:15px;font-weight:600;display:flex;align-items:center;gap:8px;
-      }
-      #coquille-info-popover p{margin:0;font-size:13px;line-height:1.5;color:#4b5563}
-      #coquille-info-popover .coquille-info-cta{
-        background:#111;color:#fff;border:none;border-radius:8px;
-        padding:9px 14px;font-size:13px;font-weight:600;cursor:pointer;
-        transition:background .15s;
-      }
-      #coquille-info-popover .coquille-info-cta:hover{background:#333}
-      #coquille-info-popover .coquille-info-credit{
-        margin-top:4px;padding-top:10px;border-top:1px solid #e5e7eb;
-        font-size:11px;color:#6b7280;text-align:center;
-      }
-      #coquille-info-popover .coquille-info-credit a{color:#3b5bff;text-decoration:none;font-weight:600}
-      #coquille-info-popover .coquille-info-credit a:hover{text-decoration:underline}
-
-      /* ── Barre de contrôles (visible uniquement en mode actif) ── */
-      #coquille-bar{
-        position:fixed;bottom:0;left:0;right:0;z-index:2147483640;
-        background:#111;border-top:1px solid #222;
-        display:none;align-items:center;gap:12px;padding:0 20px;height:48px;
-        box-shadow:0 -4px 24px rgba(0,0,0,.4);
-        transform:translateY(100%);transition:transform .25s;
-      }
-      body.coquille-mode-active #coquille-bar{display:flex;transform:translateY(0)}
-
-      .coquille-dot{width:8px;height:8px;border-radius:50%;background:#22c55e;flex-shrink:0;animation:coquille-pulse 2s infinite}
-      @keyframes coquille-pulse{0%,100%{opacity:1}50%{opacity:.3}}
-
-      #coquille-label{color:#aaa;font-size:13px;font-weight:500;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-      #coquille-label strong{color:#f0f0f0}
-      #coquille-label a{color:#facc15;text-decoration:none}
-      #coquille-label a:hover{text-decoration:underline}
-
-      #coquille-hint{
-        color:#666;font-size:11px;font-style:italic;
-        display:flex;gap:6px;align-items:center;
-      }
-      #coquille-hint kbd{
-        background:#1a1a1a;border:1px solid #333;border-radius:4px;
-        padding:1px 6px;font-size:10px;color:#aaa;font-family:ui-monospace,monospace;
-      }
-
-      #coquille-stop-btn{
-        background:transparent;border:1px solid #333;color:#ccc;
-        border-radius:8px;padding:6px 14px;font-size:13px;font-weight:500;cursor:pointer;transition:all .15s;
-      }
-      #coquille-stop-btn:hover{background:#222;color:#fff}
-
-      /* ── Bulle d'annotation ── */
-      #coquille-bubble{
-        position:absolute;z-index:2147483645;
-        background:#111;border:1px solid #2a2a2a;border-radius:14px;
-        padding:16px;width:340px;
-        box-shadow:0 16px 48px rgba(0,0,0,.6);
-        display:none;flex-direction:column;gap:10px;
-        bottom:56px;
-      }
-      #coquille-bubble.coquille-visible{display:flex}
-
-      #coquille-bubble-header{display:flex;align-items:center;justify-content:space-between;font-size:12px;color:#666}
-      #coquille-bubble-header span{color:#aaa;font-weight:500}
-      #coquille-bubble-close{background:none;border:none;color:#555;font-size:16px;cursor:pointer;padding:0;line-height:1}
-      #coquille-bubble-close:hover{color:#aaa}
-
-      #coquille-original-text{
-        font-size:12px;color:#777;background:#1a1a1a;
-        border-left:2px solid #333;padding:8px 10px;border-radius:6px;line-height:1.5;
-        display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;
-      }
-      #coquille-original-text.coquille-zone-preview{
-        border-left-color:#facc15;color:#aaa;font-family:ui-monospace,Menlo,monospace;font-size:11px;
-      }
-
-      #coquille-textarea, #coquille-reviewer-name, #coquille-reviewer-email{
-        background:#1a1a1a;border:1px solid #2a2a2a;border-radius:8px;
-        color:#f0f0f0;font-size:13px;line-height:1.5;
-        padding:10px 12px;width:100%;outline:none;transition:border-color .15s;font-family:inherit;
-      }
-      #coquille-textarea{resize:vertical;min-height:80px}
-      #coquille-textarea:focus, #coquille-reviewer-name:focus, #coquille-reviewer-email:focus{border-color:#444}
-      #coquille-textarea::placeholder, #coquille-reviewer-name::placeholder, #coquille-reviewer-email::placeholder{color:#444}
-      #coquille-reviewer-email.coquille-invalid{border-color:#ef4444}
-
-      #coquille-reviewer-row{display:<?php echo $is_logged ? 'none' : 'flex'; ?>;flex-direction:column;gap:8px}
-      #coquille-privacy{margin:0;font-size:11px;line-height:1.4;color:#94a3b8}
-      #coquille-privacy a{color:inherit;text-decoration:underline}
-
-      #coquille-type-row{display:flex;gap:6px}
-      .coquille-type-btn{
-        flex:1;padding:5px 0;border-radius:6px;border:1px solid #222;
-        background:#1a1a1a;color:#666;font-size:11px;cursor:pointer;
-        transition:all .15s;text-align:center;
-      }
-      .coquille-type-btn.coquille-active{background:#222;color:#f0f0f0;border-color:#444}
-
-      #coquille-actions{display:flex;gap:8px}
-      #coquille-send-btn{
-        flex:1;background:#facc15;color:#111;border:none;
-        border-radius:8px;padding:9px;font-size:13px;font-weight:600;cursor:pointer;transition:background .15s;
-      }
-      #coquille-send-btn:hover{background:#fde047}
-      #coquille-send-btn:disabled{background:#222;color:#555;cursor:default}
-      #coquille-cancel-btn{background:transparent;border:1px solid #222;color:#666;border-radius:8px;padding:9px 14px;font-size:13px;cursor:pointer}
-      #coquille-cancel-btn:hover{border-color:#333;color:#aaa}
-
-      /* Honeypot (champ caché anti-bot) */
-      #coquille-hp{position:absolute;left:-9999px;width:1px;height:1px;opacity:0;pointer-events:none}
-
-      /* ── Toast ── */
-      #coquille-toast{
-        position:fixed;bottom:90px;right:24px;z-index:2147483646;
-        background:#111;border:1px solid #2a2a2a;border-radius:10px;
-        padding:10px 16px;font-size:13px;color:#f0f0f0;
-        opacity:0;pointer-events:none;
-        transition:opacity .25s,transform .25s;transform:translateY(8px);
-      }
-      #coquille-toast.coquille-show{opacity:1;transform:translateY(0)}
-      #coquille-toast.coquille-success{border-color:#22c55e;color:#22c55e}
-      #coquille-toast.coquille-error{border-color:#ef4444;color:#ef4444}
-
-      /* ── GEL DE PAGE en mode revue ── */
-      #coquille-page-dim{
-        position:fixed;inset:0;z-index:2147483630;
-        background:rgba(10,10,15,.18);pointer-events:none;display:none;
-      }
-      body.coquille-mode-active #coquille-page-dim{display:block}
-
-      /* En mode revue, on garde tout sélectionnable (texte dans les liens compris),
-         mais on intercepte les clics via JS pour bloquer la navigation. */
-      body.coquille-mode-active ::selection{background:rgba(250,204,21,.35)}
-
-      /* Curseur intelligent : I-beam sur du texte, crosshair sur les zones vides */
-      body.coquille-mode-active.coquille-cursor-text, body.coquille-mode-active.coquille-cursor-text *{cursor:text !important}
-      body.coquille-mode-active.coquille-cursor-zone, body.coquille-mode-active.coquille-cursor-zone *{cursor:crosshair !important}
-      /* L'UI du plugin garde toujours son propre curseur */
-      body.coquille-mode-active #coquille-fab, body.coquille-mode-active #coquille-fab *{cursor:pointer !important}
-      body.coquille-mode-active #coquille-bar, body.coquille-mode-active #coquille-bar *,
-      body.coquille-mode-active #coquille-bubble, body.coquille-mode-active #coquille-bubble *,
-      body.coquille-mode-active #coquille-info-popover, body.coquille-mode-active #coquille-info-popover *{cursor:auto !important}
-      body.coquille-mode-active #coquille-textarea, body.coquille-mode-active #coquille-reviewer-name{cursor:text !important}
-      body.coquille-mode-active #coquille-send-btn, body.coquille-mode-active #coquille-cancel-btn,
-      body.coquille-mode-active .coquille-type-btn, body.coquille-mode-active #coquille-stop-btn,
-      body.coquille-mode-active #coquille-bubble-close{cursor:pointer !important}
-
-      #coquille-zone-rect{
-        position:fixed;z-index:2147483636;
-        border:2px dashed #facc15;background:rgba(250,204,21,.15);
-        pointer-events:none;display:none;
-      }
-      #coquille-zone-rect.coquille-drawing{display:block}
-
-      #coquille-zone-highlight{
-        position:absolute;z-index:2147483637;
-        border:2px solid #facc15;background:rgba(250,204,21,.10);
-        box-shadow:0 0 0 9999px rgba(10,10,15,.35);
-        pointer-events:none;display:none;border-radius:2px;
-      }
-      #coquille-zone-highlight.coquille-visible{display:block}
-
-      @media(max-width:600px){
-        #coquille-info-popover{width:calc(100vw - 32px);right:16px}
-        #coquille-bubble{width:calc(100vw - 32px);left:16px;right:16px}
-        #coquille-label{display:none}
-        #coquille-fab{bottom:16px;right:16px}
-      }
-    </style>
-
+    <!-- Coquille Revue Plugin v<?php echo esc_html(COQUILLE_REVUE_VERSION); ?> · <?php echo esc_html(COQUILLE_REVUE_AUTHOR); ?> -->
+    <div id="coquille-revue-root">
     <div id="coquille-page-dim"></div>
     <div id="coquille-zone-rect"></div>
     <div id="coquille-zone-highlight"></div>
@@ -496,14 +333,16 @@ function coquille_revue_inject_review_ui() {
         <button id="coquille-bubble-close">×</button>
       </div>
       <div id="coquille-original-text"></div>
+      <?php if (!$is_logged): ?>
       <div id="coquille-reviewer-row">
-        <input id="coquille-reviewer-name" type="text" placeholder="Votre nom (facultatif)" maxlength="100" autocomplete="name">
+        <input id="coquille-reviewer-name" type="text" placeholder="Votre nom (facultatif)" maxlength="<?php echo (int) $max['reviewerName']; ?>" autocomplete="name">
         <?php if ($ask_email): ?>
-        <input id="coquille-reviewer-email" type="email" placeholder="Votre email (facultatif — pour qu’on vous prévienne)" maxlength="180" autocomplete="email">
+        <input id="coquille-reviewer-email" type="email" placeholder="Votre email (facultatif — pour qu’on vous prévienne)" maxlength="<?php echo (int) $max['reviewerEmail']; ?>" autocomplete="email">
         <?php endif; ?>
       </div>
+      <?php endif; ?>
       <p id="coquille-privacy"><?php if ($ask_email): ?>Nom et e-mail facultatifs. L'e-mail sert uniquement à vous prévenir quand votre suggestion est appliquée, puis il est effacé.<?php else: ?>Nom facultatif.<?php endif; ?> L'adresse IP est conservée <?php echo (int) COQUILLE_REVUE_IP_RETENTION_DAYS; ?> jours contre le spam. Les suggestions peuvent être traitées avec un assistant IA.<?php if ($privacy): ?> <a href="<?php echo esc_url($privacy); ?>" target="_blank" rel="noopener noreferrer">Confidentialité</a><?php endif; ?></p>
-      <textarea id="coquille-textarea" placeholder="Votre suggestion… (Entrée pour envoyer, Maj+Entrée pour saut de ligne, Échap pour annuler)" maxlength="2000"></textarea>
+      <textarea id="coquille-textarea" placeholder="Votre suggestion… (Entrée pour envoyer, Maj+Entrée pour saut de ligne, Échap pour annuler)" maxlength="<?php echo (int) COQUILLE_REVUE_MAX_TEXT_LENGTH; ?>"></textarea>
       <div id="coquille-type-row">
         <button class="coquille-type-btn coquille-active" data-type="correction">✏️ Correction</button>
         <button class="coquille-type-btn" data-type="suggestion">💡 Suggestion</button>
@@ -517,455 +356,7 @@ function coquille_revue_inject_review_ui() {
     </div>
 
     <div id="coquille-toast"></div>
-
-    <script>
-    (function () {
-      'use strict';
-
-      const API_ROOT   = '<?php echo $api_root; ?>';
-      const NONCE      = '<?php echo esc_js($nonce); ?>';
-      const PAGE_URL   = window.location.origin + window.location.pathname;
-      const PAGE_TITLE = document.title;
-      const IS_LOGGED  = <?php echo $is_logged ? 'true' : 'false'; ?>;
-
-      const fab          = document.getElementById('coquille-fab');
-      const infoPop      = document.getElementById('coquille-info-popover');
-      const infoStartBtn = document.getElementById('coquille-info-start');
-      const bar          = document.getElementById('coquille-bar');
-      const stopBtn      = document.getElementById('coquille-stop-btn');
-      const bubble       = document.getElementById('coquille-bubble');
-      const bubbleTitle  = document.getElementById('coquille-bubble-title');
-      const textarea     = document.getElementById('coquille-textarea');
-      const reviewerName = document.getElementById('coquille-reviewer-name');
-      const reviewerEmail = document.getElementById('coquille-reviewer-email');
-      const honeypot     = document.getElementById('coquille-hp');
-      const origText     = document.getElementById('coquille-original-text');
-      const sendBtn      = document.getElementById('coquille-send-btn');
-      const cancelBtn    = document.getElementById('coquille-cancel-btn');
-      const toast        = document.getElementById('coquille-toast');
-      const zoneRect     = document.getElementById('coquille-zone-rect');
-      const zoneHL       = document.getElementById('coquille-zone-highlight');
-
-      let reviewModeActive = false;
-      let currentAnnotation = null;
-      let activeType = 'correction';
-
-      // Helpers pour le détecteur "sur du texte ou pas"
-      function isPluginEl(el) {
-        if (!el) return false;
-        return el.closest && (el.closest('#coquille-fab') || el.closest('#coquille-bar') ||
-               el.closest('#coquille-bubble') || el.closest('#coquille-info-popover') ||
-               el.closest('#coquille-zone-highlight') || el.closest('#coquille-zone-rect') ||
-               el.closest('#coquille-toast'));
-      }
-      function isOverText(x, y) {
-        let range = null, offset = 0;
-        if (document.caretRangeFromPoint) {
-          range = document.caretRangeFromPoint(x, y);
-          if (range) offset = range.startOffset;
-        } else if (document.caretPositionFromPoint) {
-          const pos = document.caretPositionFromPoint(x, y);
-          if (pos) { range = { startContainer: pos.offsetNode }; offset = pos.offset; }
-        }
-        if (!range || !range.startContainer) return false;
-        const node = range.startContainer;
-        if (node.nodeType !== Node.TEXT_NODE) return false;
-        if (!node.textContent || !node.textContent.trim()) return false;
-
-        // Vérifie que le point est vraiment SUR un glyphe (pas sur un padding adjacent).
-        // On mesure le rect du caractère le plus proche et exige une proximité < 6 px.
-        try {
-          const r = document.createRange();
-          const safeOffset = Math.min(Math.max(offset, 0), node.textContent.length - 1);
-          r.setStart(node, safeOffset);
-          r.setEnd(node, safeOffset + 1);
-          const rect = r.getBoundingClientRect();
-          if (!rect || (rect.width === 0 && rect.height === 0)) return false;
-          const dx = Math.max(rect.left - x, x - rect.right, 0);
-          const dy = Math.max(rect.top - y, y - rect.bottom, 0);
-          return dx < 6 && dy < 6;
-        } catch (e) {
-          return true; // fallback prudent : on suppose qu'on est sur du texte
-        }
-      }
-
-      // ── Helpers ──────────────────────────────────────────────────────────
-      function getXPath(node) {
-        if (node.nodeType === Node.TEXT_NODE) node = node.parentElement;
-        if (!node || node === document.body) return '/html/body';
-        const parts = [];
-        while (node && node !== document.documentElement) {
-          let idx = 1, sib = node.previousElementSibling;
-          while (sib) { if (sib.tagName === node.tagName) idx++; sib = sib.previousElementSibling; }
-          parts.unshift(node.tagName.toLowerCase() + '[' + idx + ']');
-          node = node.parentElement;
-        }
-        return '/html/' + parts.join('/');
-      }
-
-      function getCssSelector(node) {
-        if (node.nodeType === Node.TEXT_NODE) node = node.parentElement;
-        if (!node) return '';
-        const parts = [];
-        while (node && node !== document.body) {
-          let sel = node.tagName.toLowerCase();
-          if (node.id) { parts.unshift('#' + node.id); break; }
-          if (node.className && typeof node.className === 'string') {
-            const cls = [...node.classList].filter(c => !/^coquille-(mode-active|cursor-text|cursor-zone|zone-preview|drawing|active|visible|invalid|show|success|error)$/.test(c)).slice(0,2).join('.');
-            if (cls) sel += '.' + cls;
-          }
-          parts.unshift(sel);
-          node = node.parentElement;
-        }
-        return parts.join(' > ');
-      }
-
-      function positionBubble(clientX) {
-        const bw = 340, vw = window.innerWidth;
-        let left = clientX + window.scrollX - bw / 2;
-        left = Math.max(16, Math.min(left, vw + window.scrollX - bw - 16));
-        bubble.style.left = left + 'px';
-        bubble.style.right = 'auto';
-      }
-
-      function showToast(msg, type) {
-        toast.textContent = msg;
-        toast.className = 'coquille-show coquille-' + type;
-        setTimeout(() => { toast.className = ''; }, 3000);
-      }
-
-      function closeBubble() {
-        bubble.classList.remove('coquille-visible');
-        zoneHL.classList.remove('coquille-visible');
-        currentAnnotation = null;
-        textarea.value = '';
-        reviewerEmail?.classList.remove('coquille-invalid');
-      }
-
-      function enterReviewMode() {
-        reviewModeActive = true;
-        document.body.classList.add('coquille-mode-active', 'coquille-cursor-text');
-        fab.classList.add('coquille-active');
-        infoPop.classList.remove('coquille-visible');
-      }
-
-      function exitReviewMode() {
-        reviewModeActive = false;
-        document.body.classList.remove('coquille-mode-active', 'coquille-cursor-text', 'coquille-cursor-zone');
-        fab.classList.remove('coquille-active');
-        zoneRect.classList.remove('coquille-drawing');
-        smartDrag = null;
-        closeBubble();
-      }
-
-      // ── FAB : popover au hover, click lance la relecture ────────────────
-      let popoverHideTimer = null;
-      function showPopover() {
-        clearTimeout(popoverHideTimer);
-        if (!reviewModeActive) infoPop.classList.add('coquille-visible');
-      }
-      function hidePopoverDelayed() {
-        clearTimeout(popoverHideTimer);
-        popoverHideTimer = setTimeout(() => infoPop.classList.remove('coquille-visible'), 220);
-      }
-      fab.addEventListener('mouseenter', showPopover);
-      fab.addEventListener('mouseleave', hidePopoverDelayed);
-      infoPop.addEventListener('mouseenter', showPopover);
-      infoPop.addEventListener('mouseleave', hidePopoverDelayed);
-
-      fab.addEventListener('click', (e) => {
-        e.stopPropagation();
-        clearTimeout(popoverHideTimer);
-        infoPop.classList.remove('coquille-visible');
-        reviewModeActive ? exitReviewMode() : enterReviewMode();
-      });
-
-      infoStartBtn.addEventListener('click', () => {
-        clearTimeout(popoverHideTimer);
-        infoPop.classList.remove('coquille-visible');
-        enterReviewMode();
-      });
-      stopBtn.addEventListener('click', exitReviewMode);
-
-      // ── Capture sélection texte ──────────────────────────────────────────
-      function captureTextSelection(clientX) {
-        const sel = window.getSelection();
-        if (!sel || sel.isCollapsed || sel.toString().trim().length < 2) return false;
-
-        const range = sel.getRangeAt(0);
-        const text  = sel.toString().trim();
-
-        currentAnnotation = {
-          mode: 'text',
-          url: PAGE_URL, pageTitle: PAGE_TITLE,
-          xpath: getXPath(range.startContainer),
-          cssSelector: getCssSelector(range.startContainer),
-          charOffsetStart: range.startOffset,
-          charOffsetEnd: range.endOffset,
-          originalText: text,
-          platform: 'wordpress',
-        };
-
-        bubbleTitle.textContent = 'Texte sélectionné';
-        origText.classList.remove('coquille-zone-preview');
-        const preview = text.slice(0, 150) + (text.length > 150 ? '…' : '');
-        origText.textContent = '« ' + preview + ' »';
-        textarea.value = '';
-
-        positionBubble(clientX);
-        bubble.classList.add('coquille-visible');
-        setTimeout(() => textarea.focus(), 60);
-        return true;
-      }
-
-      // ── Capture d'une zone (rectangle drag) ──────────────────────────────
-      function captureZone(x, y, w, h) {
-        const cx = x + w / 2, cy = y + h / 2;
-        // Trouve l'élément sous le centre (on est sûr qu'aucun overlay plein écran ne masque)
-        const elBehind = document.elementFromPoint(cx, cy) || document.body;
-
-        zoneHL.style.left = (x + window.scrollX) + 'px';
-        zoneHL.style.top  = (y + window.scrollY) + 'px';
-        zoneHL.style.width = w + 'px';
-        zoneHL.style.height = h + 'px';
-        zoneHL.classList.add('coquille-visible');
-
-        const elText = (elBehind.innerText || '').trim().slice(0, 120);
-
-        currentAnnotation = {
-          mode: 'zone',
-          url: PAGE_URL, pageTitle: PAGE_TITLE,
-          xpath: getXPath(elBehind),
-          cssSelector: getCssSelector(elBehind),
-          charOffsetStart: 0, charOffsetEnd: 0,
-          originalText: elText || '(zone sans texte direct)',
-          platform: 'wordpress',
-          zoneData: {
-            x: Math.round(x + window.scrollX), y: Math.round(y + window.scrollY),
-            w: Math.round(w), h: Math.round(h),
-            viewport_w: window.innerWidth, viewport_h: window.innerHeight,
-            element_tag: elBehind.tagName?.toLowerCase() || 'body',
-          },
-        };
-
-        bubbleTitle.textContent = 'Zone sélectionnée (' + Math.round(w) + '×' + Math.round(h) + ')';
-        origText.classList.add('coquille-zone-preview');
-        origText.textContent = currentAnnotation.cssSelector + (elText ? ' — « ' + elText + (elText.length>=120?'…':'') + ' »' : '');
-        textarea.value = '';
-
-        positionBubble(cx);
-        bubble.classList.add('coquille-visible');
-        setTimeout(() => textarea.focus(), 60);
-      }
-
-      // ── Logique unifiée : curseur intelligent + capture auto ─────────────
-      let smartDrag = null;     // { x, y, isDrag }
-      let lastOverText = null;  // null = pas encore détecté
-      let cursorThrottle = 0;
-
-      function updateCursorAt(x, y) {
-        const el = document.elementFromPoint(x, y);
-        if (isPluginEl(el)) return; // ne pas toucher au curseur dans notre UI
-        const onText = isOverText(x, y);
-        if (onText !== lastOverText) {
-          document.body.classList.toggle('coquille-cursor-text', onText);
-          document.body.classList.toggle('coquille-cursor-zone', !onText);
-          lastOverText = onText;
-        }
-      }
-
-      document.addEventListener('mousemove', (e) => {
-        if (!reviewModeActive) return;
-        if (smartDrag) {
-          const dx = Math.abs(e.clientX - smartDrag.x);
-          const dy = Math.abs(e.clientY - smartDrag.y);
-          if (smartDrag.isDrag || dx > 5 || dy > 5) {
-            smartDrag.isDrag = true;
-            const x = Math.min(smartDrag.x, e.clientX);
-            const y = Math.min(smartDrag.y, e.clientY);
-            zoneRect.style.left = x + 'px'; zoneRect.style.top = y + 'px';
-            zoneRect.style.width = Math.abs(e.clientX - smartDrag.x) + 'px';
-            zoneRect.style.height = Math.abs(e.clientY - smartDrag.y) + 'px';
-            zoneRect.classList.add('coquille-drawing');
-          }
-          return;
-        }
-        // Throttle à ~30 Hz
-        const now = performance.now();
-        if (now - cursorThrottle < 33) return;
-        cursorThrottle = now;
-        updateCursorAt(e.clientX, e.clientY);
-      });
-
-      document.addEventListener('mousedown', (e) => {
-        if (!reviewModeActive) return;
-        if (isPluginEl(e.target)) return;
-        // Si on clique sur du texte, on laisse le navigateur faire la sélection
-        if (isOverText(e.clientX, e.clientY)) return;
-        // Sinon, on amorce un drag potentiel pour capture de zone
-        smartDrag = { x: e.clientX, y: e.clientY, isDrag: false };
-        e.preventDefault(); // empêche les drag images / sélections parasites
-      });
-
-      document.addEventListener('mouseup', (e) => {
-        if (!reviewModeActive) return;
-        if (isPluginEl(e.target)) { smartDrag = null; return; }
-
-        // Cas 1 : on a fait un drag de zone
-        if (smartDrag && smartDrag.isDrag) {
-          const x = Math.min(smartDrag.x, e.clientX);
-          const y = Math.min(smartDrag.y, e.clientY);
-          const w = Math.abs(e.clientX - smartDrag.x);
-          const h = Math.abs(e.clientY - smartDrag.y);
-          zoneRect.classList.remove('coquille-drawing');
-          smartDrag = null;
-          if (w >= 8 && h >= 8) captureZone(x, y, w, h);
-          return;
-        }
-        smartDrag = null;
-
-        // Cas 2 : pas de drag → on regarde si une sélection texte existe
-        captureTextSelection(e.clientX);
-      });
-
-      // Intercepte tous les clics en mode revue pour bloquer la navigation
-      document.addEventListener('click', (e) => {
-        if (!reviewModeActive) return;
-        if (isPluginEl(e.target)) return;
-        e.preventDefault();
-        e.stopPropagation();
-      }, true);
-
-      // Tactile : on supporte uniquement la sélection texte
-      document.addEventListener('touchend', (e) => {
-        if (!reviewModeActive) return;
-        if (isPluginEl(e.target)) return;
-        setTimeout(() => {
-          const sel = window.getSelection();
-          if (!sel || sel.isCollapsed) return;
-          const rect = sel.getRangeAt(0).getBoundingClientRect();
-          captureTextSelection(rect.left + rect.width / 2);
-        }, 100);
-      });
-
-      // ── Type d'annotation ────────────────────────────────────────────────
-      document.querySelectorAll('.coquille-type-btn').forEach(btn => {
-        btn.addEventListener('click', () => {
-          document.querySelectorAll('.coquille-type-btn').forEach(b => b.classList.remove('coquille-active'));
-          btn.classList.add('coquille-active');
-          activeType = btn.dataset.type;
-        });
-      });
-
-      // ── Envoi ────────────────────────────────────────────────────────────
-      let sending = false;
-      async function sendAnnotation() {
-        if (sending) return false;
-        if (!currentAnnotation || textarea.value.trim().length < 2) { textarea.focus(); return false; }
-        sending = true;
-
-        // Mêmes longueurs maximales que le serveur
-        const cut = (s, n) => (s || '').slice(0, n);
-        const payload = {
-          url: cut(currentAnnotation.url, 2000), pageTitle: cut(currentAnnotation.pageTitle, 255),
-          xpath: cut(currentAnnotation.xpath, 1000), cssSelector: cut(currentAnnotation.cssSelector, 500),
-          charOffsetStart: currentAnnotation.charOffsetStart, charOffsetEnd: currentAnnotation.charOffsetEnd,
-          originalText: cut(currentAnnotation.originalText, 2000), suggestion: textarea.value.trim(),
-          type: activeType, platform: currentAnnotation.platform,
-          annotationMode: currentAnnotation.mode, zoneData: currentAnnotation.zoneData || null,
-          // Champs vides omis : le serveur n'a rien à nettoyer
-          reviewerName: reviewerName.value.trim() || undefined,
-          reviewerEmail: reviewerEmail?.value.trim() || undefined,
-          hp: honeypot.value, // doit rester vide
-        };
-
-        // Validation email côté client (si renseigné)
-        if (payload.reviewerEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(payload.reviewerEmail)) {
-          reviewerEmail.classList.add('coquille-invalid');
-          reviewerEmail.focus();
-          sending = false;
-          return false;
-        }
-        reviewerEmail?.classList.remove('coquille-invalid');
-
-        sendBtn.disabled = true;
-        sendBtn.textContent = 'Envoi…';
-
-        try {
-          const res = await fetch(API_ROOT + '/annotation', {
-            method: 'POST',
-            headers: NONCE ? { 'Content-Type': 'application/json', 'X-WP-Nonce': NONCE } : { 'Content-Type': 'application/json' },
-            credentials: 'include',
-            body: JSON.stringify(payload),
-          });
-          if (!res.ok) {
-            const err = await res.json().catch(() => ({}));
-            const messages = {
-              413: 'Votre texte est trop long.',
-              429: 'Trop d’envois pour le moment, réessayez dans quelques minutes.',
-              401: 'Connectez-vous pour proposer une correction.',
-              403: 'Vous n’avez pas les droits pour proposer une correction.',
-            };
-            throw new Error(messages[res.status] || err.message || 'Envoi impossible (erreur ' + res.status + ').');
-          }
-          showToast('✓ Merci, votre suggestion a été envoyée', 'success');
-          exitReviewMode(); // sortie automatique du mode après envoi réussi
-          return true;
-        } catch (err) {
-          showToast('✗ ' + err.message, 'error');
-          return false;
-        } finally {
-          sending = false;
-          sendBtn.disabled = false;
-          sendBtn.textContent = 'Envoyer';
-        }
-      }
-      sendBtn.addEventListener('click', sendAnnotation);
-
-      // Auto-envoi sur Enter (Shift+Enter = saut de ligne classique)
-      textarea.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter' && !e.shiftKey) {
-          e.preventDefault();
-          sendAnnotation();
-        }
-      });
-
-      cancelBtn.addEventListener('click', closeBubble);
-      document.getElementById('coquille-bubble-close').addEventListener('click', closeBubble);
-
-      document.addEventListener('keydown', (e) => {
-        if (e.key === 'Escape') {
-          if (bubble.classList.contains('coquille-visible')) closeBubble();
-          else if (reviewModeActive) exitReviewMode();
-          else if (infoPop.classList.contains('coquille-visible')) infoPop.classList.remove('coquille-visible');
-        }
-        if (e.ctrlKey && e.shiftKey && e.key === 'R') {
-          e.preventDefault();
-          reviewModeActive ? exitReviewMode() : enterReviewMode();
-        }
-      });
-
-      // Auto-envoi sur fermeture si du texte est saisi (sinon, on ferme juste)
-      function autoSendOrClose() {
-        if (currentAnnotation && textarea.value.trim().length >= 2) {
-          sendAnnotation(); // ferme automatiquement après succès
-        } else {
-          closeBubble();
-        }
-      }
-
-      // Clic en dehors → tentative d'auto-envoi
-      document.addEventListener('mousedown', (e) => {
-        if (smartDrag) return;
-        if (bubble.classList.contains('coquille-visible') &&
-            !bubble.contains(e.target) && !bar.contains(e.target) &&
-            !infoPop.contains(e.target) && !fab.contains(e.target)) {
-          autoSendOrClose();
-        }
-      });
-
-    })();
-    </script>
+    </div>
     <?php
 }
 
