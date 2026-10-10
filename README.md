@@ -20,7 +20,7 @@ Extension WordPress open source pour relire un site directement sur ses pages : 
 1. Téléchargez le zip de la dernière version dans l'onglet [Releases](https://github.com/Atelier-4F-digital/coquille-revue/releases).
 2. Dans WordPress : **Extensions > Ajouter une extension > Téléverser une extension**, puis activez-la.
 
-Prérequis : WordPress 5.8 ou plus, PHP 7.4 ou plus. En multisite, l'extension s'active site par site ou pour tout le réseau ; chaque site ne voit que ses propres annotations.
+Prérequis : WordPress 6.2 ou plus, PHP 7.4 ou plus. En multisite, l'extension s'active site par site ou pour tout le réseau ; chaque site ne voit que ses propres annotations.
 
 Par défaut, seules les personnes connectées qui peuvent modifier des articles annotent. Le **mode public** (tous les visiteurs, avec anti-spam) s'active depuis la page **Coquille Revue** de l'administration.
 

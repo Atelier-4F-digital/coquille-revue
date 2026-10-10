@@ -6,6 +6,7 @@ Toutes les évolutions notables de Coquille Revue. Format inspiré de [Keep a Ch
 
 ### Changements incompatibles
 
+- WordPress 6.2 minimum (au lieu de 5.8) : toutes les requêtes SQL passent le nom de la table par le marqueur `%i` de `$wpdb->prepare()`, apparu dans cette version.
 - Raccourci clavier : Ctrl+Maj+R (le rechargement forcé du navigateur) n'est plus détourné. Le mode relecture s'ouvre et se ferme avec **Alt+Maj+C** (Option+Maj+C sur Mac), pour les personnes connectées seulement, et jamais pendant une saisie dans un champ.
 - API REST : le champ `platform`, ignoré par le serveur, n'est plus déclaré ni envoyé par le script (un ancien script qui l'envoie encore est accepté).
 - API REST : chaque champ est validé (type, longueur, valeurs permises) avant d'être nettoyé. Une valeur du mauvais type (un tableau à la place d'un texte, par exemple) reçoit une erreur 400 au lieu de faire planter PHP ; un champ trop long reçoit 400 et non plus 413. Le texte d'origine et la suggestion doivent faire au moins 2 caractères.
@@ -29,6 +30,8 @@ Toutes les évolutions notables de Coquille Revue. Format inspiré de [Keep a Ch
 - Crédit public masqué par défaut : plus de lien « plugin par Atelier 4F Digital » dans la barre de relecture des visiteurs, ni de commentaire HTML avec le nom et la version de l'extension dans les pages. Le crédit reste dans la page d'admin, les exports et les README.
 - Interface publique : le CSS et le JavaScript ne sont plus écrits dans chaque page. WordPress les charge depuis `assets/css/overlay.css` et `assets/js/overlay.js` (script en pied de page, en `defer`), avec la version de l'extension en `?ver=`. La configuration (adresse de l'API, jeton, longueurs maximales, textes) est passée dans `window.coquilleRevueConfig`. Rien n'est chargé quand l'interface ne s'affiche pas (mode privé et visiteur non connecté). Avec une règle CSP stricte, seule cette configuration écrite dans la page a besoin d'un nonce (filtre `wp_inline_script_attributes`). Après une mise à jour, vider le cache de page ; si un outil d'optimisation retarde ou fusionne les scripts, en exclure `coquille-revue`.
 - Page d'admin : styles dans `assets/css/admin.css`, chargé seulement sur la page Coquille Revue (plus aucun attribut `style`). Couleurs des statuts plus foncées, pour un contraste d'au moins 4,5:1 ; icônes de WordPress (dashicons) à la place des emojis ; tout le texte est échappé au moment de l'affichage.
+- Page d'admin : la confirmation avant « Appliqué » passe par un attribut `data-coquille-confirm` et un petit script chargé par WordPress, au lieu d'un attribut `onclick`. Les liens de changement de statut d'une page ouverte avant la mise à jour ne marchent plus (« Le lien a expiré ») : recharger la page.
+- Alertes : les points de code (U+XXXX) des caractères invisibles et des alphabets mélangés sont calculés sans l'extension PHP mbstring, que WordPress n'exige pas.
 
 ### Sécurité
 
@@ -39,6 +42,7 @@ Toutes les évolutions notables de Coquille Revue. Format inspiré de [Keep a Ch
 - « Tout supprimer » est un formulaire (POST) avec une case de confirmation obligatoire : la confirmation marche sans JavaScript et sous une CSP stricte, et un simple lien, même avec un jeton valide, ne supprime plus rien.
 - Anti-spam : en plus des limites existantes, au plus 10 envois anonymes par heure et par adresse IP, pour qu'une seule adresse ne puisse pas épuiser le quota du site (30 par heure).
 - Page d'admin : un paramètre d'adresse piégé (`coquille_revue_msg[]=1`, `format[]=…`) ne fait plus planter la page ; les liens ouverts dans un nouvel onglet ont `rel="noopener noreferrer"`.
+- Changement de statut depuis la page d'admin : le jeton de sécurité est vérifié avant toute lecture des paramètres de l'adresse.
 - Exports CSV, JSON et Markdown et `wp coquille-revue list` lisent la base par lots de 500 et écrivent au fil de l'eau : la mémoire reste stable quel que soit le nombre d'annotations.
 
 ## [2.5.0] — 2026-10-09 — première version publique

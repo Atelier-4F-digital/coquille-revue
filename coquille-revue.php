@@ -9,7 +9,7 @@
  * Text Domain: coquille-revue
  * License:     GPL-2.0-or-later
  * License URI: https://www.gnu.org/licenses/gpl-2.0.html
- * Requires at least: 5.8
+ * Requires at least: 6.2
  * Requires PHP: 7.4
  */
 
@@ -94,6 +94,9 @@ register_deactivation_hook(__FILE__, 'coquille_revue_unschedule_events');
 add_action('plugins_loaded', 'coquille_revue_maybe_upgrade');
 add_action('wp_uninitialize_site', 'coquille_revue_delete_site_rows');
 
+// Toutes les requêtes passent ce nom par le marqueur %i de $wpdb->prepare() (WordPress 6.2). Elles visent
+// directement la table de l'extension, faute d'API WordPress pour elle, sans cache objet (lectures ponctuelles,
+// toujours à jour) : d'où les commentaires phpcs:ignore WordPress.DB.DirectDatabaseQuery.
 function coquille_revue_table() {
     global $wpdb;
     return $wpdb->base_prefix . 'coquille_revue_annotations';
@@ -159,7 +162,8 @@ function coquille_revue_assign_blog_ids() {
     global $wpdb;
     $table = coquille_revue_table();
     if (!is_multisite()) {
-        $wpdb->query("UPDATE {$table} SET blog_id = 1 WHERE blog_id = 0");
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery -- plugin table, one-off migration.
+        $wpdb->query($wpdb->prepare('UPDATE %i SET blog_id = 1 WHERE blog_id = 0', $table));
         return;
     }
     $sites = get_sites(['number' => 0]);
@@ -167,9 +171,10 @@ function coquille_revue_assign_blog_ids() {
     foreach ($sites as $site) {
         foreach (['http', 'https'] as $scheme) {
             $base = $scheme . '://' . $site->domain . $site->path;
+            // phpcs:ignore WordPress.DB.DirectDatabaseQuery -- plugin table, one-off migration.
             $wpdb->query($wpdb->prepare(
-                "UPDATE {$table} SET blog_id = %d WHERE blog_id = 0 AND (url LIKE %s OR url = %s)",
-                (int) $site->blog_id, $wpdb->esc_like($base) . '%', untrailingslashit($base)
+                'UPDATE %i SET blog_id = %d WHERE blog_id = 0 AND (url LIKE %s OR url = %s)',
+                $table, (int) $site->blog_id, $wpdb->esc_like($base) . '%', untrailingslashit($base)
             ));
         }
     }
@@ -180,14 +185,17 @@ function coquille_revue_assign_blog_ids() {
 function coquille_revue_clean_legacy_rows() {
     global $wpdb;
     $table = coquille_revue_table();
-    $wpdb->query("UPDATE {$table} SET user_agent = NULL WHERE user_agent IS NOT NULL");
-    foreach ($wpdb->get_results("SELECT id, url, zone_data FROM {$table}", ARRAY_A) as $row) {
+    // phpcs:ignore WordPress.DB.DirectDatabaseQuery -- plugin table, one-off migration.
+    $wpdb->query($wpdb->prepare('UPDATE %i SET user_agent = NULL WHERE user_agent IS NOT NULL', $table));
+    // phpcs:ignore WordPress.DB.DirectDatabaseQuery -- plugin table, one-off migration.
+    foreach ($wpdb->get_results($wpdb->prepare('SELECT id, url, zone_data FROM %i', $table), ARRAY_A) as $row) {
         $data = ['url' => coquille_revue_clean_url($row['url'])];
         if ($row['zone_data']) {
             $zone = coquille_revue_clean_zone(json_decode($row['zone_data'], true));
             $data['zone_data'] = $zone ? wp_json_encode($zone) : null;
         }
         if ($data['url'] !== $row['url'] || ($row['zone_data'] && $data['zone_data'] !== $row['zone_data'])) {
+            // phpcs:ignore WordPress.DB.DirectDatabaseQuery -- plugin table, one-off migration.
             $wpdb->update($table, $data, ['id' => (int) $row['id']]);
         }
     }
@@ -195,6 +203,7 @@ function coquille_revue_clean_legacy_rows() {
 
 function coquille_revue_delete_site_rows($site) {
     global $wpdb;
+    // phpcs:ignore WordPress.DB.DirectDatabaseQuery -- plugin table: rows of a deleted site.
     $wpdb->delete(coquille_revue_table(), ['blog_id' => (int) $site->blog_id]);
 }
 
@@ -215,19 +224,25 @@ add_action('coquille_revue_purge_personal_data', function () {
     global $wpdb;
     $table = coquille_revue_table();
     // created_at est posé par l'horloge MySQL (CURRENT_TIMESTAMP) : on compare avec la même horloge.
+    // phpcs:ignore WordPress.DB.DirectDatabaseQuery -- plugin table, daily purge of personal data.
     $wpdb->query($wpdb->prepare(
-        "UPDATE {$table} SET reviewer_ip = NULL, user_agent = NULL WHERE reviewer_ip IS NOT NULL AND created_at < DATE_SUB(NOW(), INTERVAL %d DAY)",
-        COQUILLE_REVUE_IP_RETENTION_DAYS
+        'UPDATE %i SET reviewer_ip = NULL, user_agent = NULL WHERE reviewer_ip IS NOT NULL AND created_at < DATE_SUB(NOW(), INTERVAL %d DAY)',
+        $table, COQUILLE_REVUE_IP_RETENTION_DAYS
     ));
     // E-mail et nom : inutiles une fois l'annotation traitée (le remerciement est déjà parti), effacés au plus tard après 6 mois.
+    // phpcs:ignore WordPress.DB.DirectDatabaseQuery -- plugin table, daily purge of personal data.
     $wpdb->query($wpdb->prepare(
-        "UPDATE {$table} SET reviewer_email = NULL, reviewer_name = NULL, author_name = IF(author_id = 0, 'Anonyme', author_name)
+        "UPDATE %i SET reviewer_email = NULL, reviewer_name = NULL, author_name = IF(author_id = 0, 'Anonyme', author_name)
          WHERE (reviewer_email IS NOT NULL OR reviewer_name IS NOT NULL)
            AND (status IN ('applied', 'rejected', 'archived') OR created_at < DATE_SUB(NOW(), INTERVAL %d DAY))",
-        COQUILLE_REVUE_EMAIL_RETENTION_DAYS
+        $table, COQUILLE_REVUE_EMAIL_RETENTION_DAYS
     ));
     if (is_multisite()) {
-        $wpdb->query("DELETE a FROM {$table} a LEFT JOIN {$wpdb->blogs} b ON b.blog_id = a.blog_id WHERE b.blog_id IS NULL AND a.blog_id > 0");
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery -- plugin table, rows of sites that no longer exist.
+        $wpdb->query($wpdb->prepare(
+            'DELETE a FROM %i a LEFT JOIN %i b ON b.blog_id = a.blog_id WHERE b.blog_id IS NULL AND a.blog_id > 0',
+            $table, $wpdb->blogs
+        ));
     }
 });
 
@@ -606,6 +621,7 @@ function coquille_revue_save_annotation(WP_REST_Request $request) {
         $reviewer_email = coquille_revue_thanks_enabled() && is_email($reviewer_email_param) ? $reviewer_email_param : null;
     }
 
+    // phpcs:ignore WordPress.DB.DirectDatabaseQuery -- plugin table.
     $ok = $wpdb->insert(coquille_revue_table(), [
         'blog_id'         => get_current_blog_id(),
         'url'             => $url,
@@ -646,10 +662,10 @@ function coquille_revue_save_annotation(WP_REST_Request $request) {
 function coquille_revue_get_rows($status, $opts = []) {
     global $wpdb;
     $opts  = wp_parse_args($opts, ['limit' => COQUILLE_REVUE_EXPORT_BATCH, 'offset' => 0, 'before_id' => 0, 'personal' => false]);
-    $table = coquille_revue_table();
+    // phpcs:ignore WordPress.DB.DirectDatabaseQuery -- plugin table, paginated read.
     $rows  = $wpdb->get_results($wpdb->prepare(
-        "SELECT * FROM {$table} WHERE blog_id = %d AND status = %s AND id < %d ORDER BY id DESC LIMIT %d OFFSET %d",
-        get_current_blog_id(), $status, $opts['before_id'] ?: PHP_INT_MAX, $opts['limit'], $opts['offset']
+        'SELECT * FROM %i WHERE blog_id = %d AND status = %s AND id < %d ORDER BY id DESC LIMIT %d OFFSET %d',
+        coquille_revue_table(), get_current_blog_id(), $status, $opts['before_id'] ?: PHP_INT_MAX, $opts['limit'], $opts['offset']
     ), ARRAY_A);
     $strip = !$opts['personal'] || !coquille_revue_can_see_personal_data();
     foreach ($rows as &$row) {
@@ -680,9 +696,9 @@ function coquille_revue_row_batches($status, $personal = false) {
 // Nombre d'annotations du site par statut, en une seule requête.
 function coquille_revue_count_by_status() {
     global $wpdb;
-    $table  = coquille_revue_table();
     $counts = array_fill_keys(COQUILLE_REVUE_STATUSES, 0);
-    $rows   = $wpdb->get_results($wpdb->prepare("SELECT status, COUNT(*) AS n FROM {$table} WHERE blog_id = %d GROUP BY status", get_current_blog_id()), ARRAY_A);
+    // phpcs:ignore WordPress.DB.DirectDatabaseQuery -- plugin table, a single grouped count per page.
+    $rows   = $wpdb->get_results($wpdb->prepare('SELECT status, COUNT(*) AS n FROM %i WHERE blog_id = %d GROUP BY status', coquille_revue_table(), get_current_blog_id()), ARRAY_A);
     foreach ($rows as $r) {
         if (isset($counts[$r['status']])) {
             $counts[$r['status']] = (int) $r['n'];
@@ -720,7 +736,8 @@ function coquille_revue_set_status($id, $status) {
     if (!in_array($status, COQUILLE_REVUE_STATUSES, true)) {
         return new WP_Error('invalid_status', 'Statut invalide.', ['status' => 400]);
     }
-    $row = $wpdb->get_row($wpdb->prepare("SELECT * FROM {$table} WHERE id = %d AND blog_id = %d", $id, $blog), ARRAY_A);
+    // phpcs:ignore WordPress.DB.DirectDatabaseQuery -- plugin table, row read just before it changes.
+    $row = $wpdb->get_row($wpdb->prepare('SELECT * FROM %i WHERE id = %d AND blog_id = %d', $table, $id, $blog), ARRAY_A);
     if (!$row) {
         return new WP_Error('not_found', 'Annotation introuvable.', ['status' => 404]);
     }
@@ -728,12 +745,14 @@ function coquille_revue_set_status($id, $status) {
     // La date d'application n'est posée qu'une fois : sur un double clic ou deux appels simultanés,
     // une seule requête modifie la ligne, et elle seule envoie le remerciement.
     $notified = false;
+    // phpcs:ignore WordPress.DB.DirectDatabaseQuery -- plugin table, atomic update that guards the thank-you e-mail.
     if ($status === 'applied' && $wpdb->query($wpdb->prepare(
-        "UPDATE {$table} SET status = %s, applied_at = %s WHERE id = %d AND blog_id = %d AND applied_at IS NULL",
-        $status, current_time('mysql'), $id, $blog
+        'UPDATE %i SET status = %s, applied_at = %s WHERE id = %d AND blog_id = %d AND applied_at IS NULL',
+        $table, $status, current_time('mysql'), $id, $blog
     ))) {
         $notified = coquille_revue_notify_contributor($row);
     } else {
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery -- plugin table.
         $wpdb->update($table, ['status' => $status], ['id' => (int) $id, 'blog_id' => $blog]);
     }
     return ['notified' => $notified];
@@ -762,10 +781,12 @@ add_action('coquille_revue_send_digest', function () {
     $table = coquille_revue_table();
     $blog  = get_current_blog_id();
     $last  = (int) get_option('coquille_revue_digest_last_id', 0);
-    $max   = (int) $wpdb->get_var($wpdb->prepare("SELECT MAX(id) FROM {$table} WHERE blog_id = %d", $blog));
+    // phpcs:ignore WordPress.DB.DirectDatabaseQuery -- plugin table, read by the digest event.
+    $max   = (int) $wpdb->get_var($wpdb->prepare('SELECT MAX(id) FROM %i WHERE blog_id = %d', $table, $blog));
+    // phpcs:ignore WordPress.DB.DirectDatabaseQuery -- plugin table, read by the digest event.
     $count = (int) $wpdb->get_var($wpdb->prepare(
-        "SELECT COUNT(*) FROM {$table} WHERE blog_id = %d AND id > %d AND id <= %d",
-        $blog, $last, $max
+        'SELECT COUNT(*) FROM %i WHERE blog_id = %d AND id > %d AND id <= %d',
+        $table, $blog, $last, $max
     ));
     update_option('coquille_revue_digest_last_id', max($last, $max), false);
     if ($count === 0) return;
@@ -852,9 +873,10 @@ add_filter('wp_privacy_personal_data_erasers', function ($erasers) {
 
 function coquille_revue_privacy_export($email, $page = 1) {
     global $wpdb;
+    // phpcs:ignore WordPress.DB.DirectDatabaseQuery -- plugin table, WordPress personal data export.
     $rows = $wpdb->get_results($wpdb->prepare(
-        'SELECT * FROM ' . coquille_revue_table() . ' WHERE blog_id = %d AND reviewer_email = %s',
-        get_current_blog_id(), $email
+        'SELECT * FROM %i WHERE blog_id = %d AND reviewer_email = %s',
+        coquille_revue_table(), get_current_blog_id(), $email
     ), ARRAY_A);
     $items = [];
     foreach ($rows as $r) {
@@ -879,9 +901,10 @@ function coquille_revue_privacy_export($email, $page = 1) {
 // Les suggestions sont gardées (elles concernent le contenu du site), mais plus rien ne relie la personne.
 function coquille_revue_privacy_erase($email, $page = 1) {
     global $wpdb;
+    // phpcs:ignore WordPress.DB.DirectDatabaseQuery -- plugin table, WordPress personal data erasure.
     $count = $wpdb->query($wpdb->prepare(
-        'UPDATE ' . coquille_revue_table() . " SET reviewer_email = NULL, reviewer_name = NULL, reviewer_ip = NULL, user_agent = NULL, author_id = 0, author_name = 'Anonyme' WHERE blog_id = %d AND reviewer_email = %s",
-        get_current_blog_id(), $email
+        "UPDATE %i SET reviewer_email = NULL, reviewer_name = NULL, reviewer_ip = NULL, user_agent = NULL, author_id = 0, author_name = 'Anonyme' WHERE blog_id = %d AND reviewer_email = %s",
+        coquille_revue_table(), get_current_blog_id(), $email
     ));
     return [
         'items_removed'  => (int) $count,
@@ -902,23 +925,25 @@ add_action('admin_post_coquille_revue_save_settings', 'coquille_revue_handle_sav
 add_action('admin_post_coquille_revue_change_status', 'coquille_revue_handle_change_status');
 
 // Paramètres d'adresse de l'administration : une valeur hors liste, ou un tableau à la place d'un texte,
-// donne la valeur par défaut au lieu de faire planter la page.
+// donne la valeur par défaut au lieu de faire planter la page. Lus sans jeton pour l'affichage (onglet, page,
+// message) ; les gestionnaires qui agissent vérifient leur jeton avant de les lire.
 function coquille_revue_query_choice($name, $allowed, $default) {
+    // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- read-only display parameter limited to an allow-list; action handlers check their nonce first.
     $value = isset($_GET[$name]) && is_string($_GET[$name]) ? sanitize_key(wp_unslash($_GET[$name])) : '';
     return in_array($value, $allowed, true) ? $value : $default;
 }
 function coquille_revue_query_page($name) {
+    // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- read-only page number; action handlers check their nonce first.
     return isset($_GET[$name]) && is_string($_GET[$name]) ? max(1, absint(wp_unslash($_GET[$name]))) : 1;
 }
 
 function coquille_revue_handle_change_status() {
     if (!coquille_revue_can_manage()) wp_die('Forbidden', 403);
+    check_admin_referer('coquille_revue_change_status');
 
-    $id     = (int) ($_GET['id'] ?? 0);
+    $id     = isset($_GET['id']) && is_string($_GET['id']) ? absint(wp_unslash($_GET['id'])) : 0;
     $status = coquille_revue_query_choice('new_status', COQUILLE_REVUE_STATUSES, '');
     $return = coquille_revue_query_choice('return_status', COQUILLE_REVUE_STATUSES, 'pending');
-
-    check_admin_referer('coquille_revue_change_status_' . $id);
 
     $result = coquille_revue_set_status($id, $status);
     $msg    = is_wp_error($result) ? ($result->get_error_code() === 'not_found' ? 'status_notfound' : 'status_invalid') : 'status_changed';
@@ -974,6 +999,7 @@ function coquille_revue_handle_reset() {
     $confirmed = !empty($_POST['coquille_revue_confirm_reset']);
     if ($confirmed) {
         global $wpdb;
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery -- plugin table.
         $wpdb->delete(coquille_revue_table(), ['blog_id' => get_current_blog_id()]);
     }
 
@@ -1094,12 +1120,24 @@ function coquille_revue_annotation_alerts($row) {
     foreach ($checks as $label => $pattern) {
         if (!preg_match($pattern, $text)) continue;
         if (isset($codepoints[$label]) && preg_match_all($codepoints[$label], $text, $m)) {
-            $codes  = array_unique(array_map(fn($c) => sprintf('U+%04X', mb_ord($c, 'UTF-8')), $m[0]));
+            $codes  = array_unique(array_map(fn($c) => sprintf('U+%04X', coquille_revue_codepoint($c)), $m[0]));
             $label .= ' (' . implode(', ', $codes) . ')';
         }
         $alerts[] = $label;
     }
     return $alerts;
+}
+
+// Point de code d'un caractère UTF-8. mb_ord() demanderait l'extension mbstring, que WordPress n'exige pas
+// (son équivalent n'entre dans le cœur qu'avec WordPress 7.1).
+function coquille_revue_codepoint($char) {
+    $bytes = array_values(unpack('C*', $char));
+    $count = count($bytes);
+    $code  = $bytes[0] & (0xFF >> ($count === 1 ? 1 : $count + 1));
+    for ($i = 1; $i < $count; $i++) {
+        $code = ($code << 6) | ($bytes[$i] & 0x3F);
+    }
+    return $code;
 }
 
 function coquille_revue_claude_code_instructions() {
@@ -1137,11 +1175,13 @@ function coquille_revue_json_payload($rows, $status, $count = null) {
 function coquille_revue_output_json($status) {
     $flags = JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES;
     $head  = wp_json_encode(coquille_revue_json_payload([], $status, coquille_revue_count_by_status()[$status]), $flags);
+    // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- JSON file download (attachment) or WP-CLI output, not HTML.
     echo substr($head, 0, -strlen("[]\n}"));
     $sep = "[\n";
     foreach (coquille_revue_row_batches($status) as $rows) {
         foreach ($rows as $row) {
             // Une chaîne JSON ne contient jamais de vrai retour à la ligne : chaque début de ligne est un début de structure.
+            // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- JSON file download (attachment) or WP-CLI output, not HTML.
             echo $sep . preg_replace('/^/m', '        ', wp_json_encode(coquille_revue_json_row($row), $flags));
             $sep = ",\n";
         }
@@ -1163,13 +1203,16 @@ function coquille_revue_format_markdown($rows, $status) {
 
 function coquille_revue_output_markdown($status) {
     $count = coquille_revue_count_by_status()[$status];
+    // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Markdown file download (attachment), not HTML.
     echo coquille_revue_markdown_head($status, $count);
     foreach (coquille_revue_row_batches($status) as $rows) {
         foreach ($rows as $r) {
+            // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Markdown file download (attachment), not HTML.
             echo coquille_revue_markdown_row($r);
         }
     }
     if ($count) {
+        // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Markdown file download (attachment), not HTML.
         echo coquille_revue_markdown_footer();
     }
 }
@@ -1284,6 +1327,7 @@ if (defined('WP_CLI') && WP_CLI) {
 
             foreach (self::variants($search) as $form => [$text]) {
                 $like  = '%' . $wpdb->esc_like($text) . '%';
+                // phpcs:ignore WordPress.DB.DirectDatabaseQuery -- WP-CLI, read-only LIKE search across core tables (no WordPress API offers it).
                 $posts = $wpdb->get_results($wpdb->prepare(
                     "SELECT ID, post_type, post_title, post_content, post_excerpt FROM {$wpdb->posts}
                      WHERE post_type <> 'revision' AND post_status NOT IN ('trash', 'auto-draft')
@@ -1298,6 +1342,7 @@ if (defined('WP_CLI') && WP_CLI) {
                     }
                 }
 
+                // phpcs:ignore WordPress.DB.DirectDatabaseQuery -- WP-CLI, read-only LIKE search across core tables (no WordPress API offers it).
                 $options = $wpdb->get_col($wpdb->prepare(
                     "SELECT option_name FROM {$wpdb->options} WHERE option_value LIKE %s AND option_name NOT LIKE %s AND option_name NOT LIKE %s AND option_name NOT LIKE %s",
                     $like, $wpdb->esc_like('_transient_') . '%', $wpdb->esc_like('_site_transient_') . '%', $wpdb->esc_like('coquille_revue_') . '%'
@@ -1308,6 +1353,7 @@ if (defined('WP_CLI') && WP_CLI) {
                     }
                 }
 
+                // phpcs:ignore WordPress.DB.DirectDatabaseQuery -- WP-CLI, read-only LIKE search across core tables (no WordPress API offers it).
                 $metas = $wpdb->get_results($wpdb->prepare("SELECT DISTINCT post_id, meta_key FROM {$wpdb->postmeta} WHERE meta_value LIKE %s", $like), ARRAY_A);
                 foreach ($metas as $m) {
                     if ($n = self::count_deep(get_post_meta((int) $m['post_id'], $m['meta_key'], true), $text)) {
@@ -1315,6 +1361,7 @@ if (defined('WP_CLI') && WP_CLI) {
                     }
                 }
 
+                // phpcs:ignore WordPress.DB.DirectDatabaseQuery -- WP-CLI, read-only LIKE search across core tables (no WordPress API offers it).
                 $terms = $wpdb->get_results($wpdb->prepare(
                     "SELECT t.term_id, t.name, tt.taxonomy, tt.description FROM {$wpdb->terms} t
                      JOIN {$wpdb->term_taxonomy} tt ON tt.term_id = t.term_id WHERE t.name LIKE %s OR tt.description LIKE %s",
@@ -1506,7 +1553,8 @@ if (defined('WP_CLI') && WP_CLI) {
 
         private static function row($id) {
             global $wpdb;
-            $row = $wpdb->get_row($wpdb->prepare('SELECT * FROM ' . coquille_revue_table() . ' WHERE id = %d AND blog_id = %d', $id, get_current_blog_id()), ARRAY_A);
+            // phpcs:ignore WordPress.DB.DirectDatabaseQuery -- plugin table.
+            $row = $wpdb->get_row($wpdb->prepare('SELECT * FROM %i WHERE id = %d AND blog_id = %d', coquille_revue_table(), $id, get_current_blog_id()), ARRAY_A);
             if (!$row) {
                 WP_CLI::error("Annotation {$id} introuvable sur ce site (en multisite, pense à --url).");
             }
@@ -1658,9 +1706,16 @@ add_action('admin_menu', function () {
 });
 
 // Pour une page de premier niveau, le suffixe vient du slug : il ne change pas avec la langue de l'administration.
+// La confirmation avant « Appliqué » (quand un remerciement va partir) lit l'attribut data-coquille-confirm :
+// aucun JavaScript dans les attributs de la page. Sans JavaScript, le lien fonctionne sans confirmation.
 add_action('admin_enqueue_scripts', function ($hook_suffix) {
     if ($hook_suffix !== 'toplevel_page_coquille-revue') return;
     wp_enqueue_style('coquille-revue-admin', plugin_dir_url(__FILE__) . 'assets/css/admin.css', [], COQUILLE_REVUE_VERSION);
+    wp_register_script('coquille-revue-admin', false, [], COQUILLE_REVUE_VERSION, true);
+    wp_enqueue_script('coquille-revue-admin');
+    wp_add_inline_script('coquille-revue-admin', "document.addEventListener('click', function (e) {"
+        . " var link = e.target.closest && e.target.closest('[data-coquille-confirm]');"
+        . " if (link && !window.confirm(link.getAttribute('data-coquille-confirm'))) e.preventDefault(); });");
 });
 
 // $will_notify : le passage à « applied » enverra un remerciement, on demande donc confirmation avant.
@@ -1680,16 +1735,14 @@ function coquille_revue_render_row_actions($id, $current_status, $return_status,
                 ['action' => 'coquille_revue_change_status', 'id' => $id, 'new_status' => $new_status, 'return_status' => $return_status, 'return_paged' => $return_paged],
                 admin_url('admin-post.php')
             ),
-            'coquille_revue_change_status_' . $id
+            'coquille_revue_change_status'
         );
-        $confirm = $new_status === 'applied' && $will_notify
-            ? 'return confirm(' . wp_json_encode('Un e-mail de remerciement va être envoyé au contributeur. Continuer ?') . ')'
-            : '';
+        $confirm = $new_status === 'applied' && $will_notify ? 'Un e-mail de remerciement va être envoyé au contributeur. Continuer ?' : '';
         printf(
             '<a href="%s" class="button button-small coquille-status--%s"%s>%s</a>',
             esc_url($url),
             esc_attr($new_status),
-            $confirm ? ' onclick="' . esc_attr($confirm) . '"' : '',
+            $confirm ? ' data-coquille-confirm="' . esc_attr($confirm) . '"' : '',
             esc_html($label)
         );
     }
@@ -1819,12 +1872,12 @@ function coquille_revue_admin_page() {
         );
     }
     if (current_user_can('manage_options')) {
-        $total_all = (int) array_sum($counts);
+        $total_all = array_sum($counts);
         printf('<form method="post" action="%s" class="coquille-revue-reset">', esc_url(admin_url('admin-post.php')));
         echo '<input type="hidden" name="action" value="coquille_revue_reset">';
         wp_nonce_field('coquille_revue_reset');
-        printf('<label><input type="checkbox" name="coquille_revue_confirm_reset" value="1" required> Supprimer définitivement les %d annotation(s) de ce site (irréversible)</label>', $total_all);
-        printf('<button type="submit" class="button coquille-revue-danger"><span class="dashicons dashicons-trash" aria-hidden="true"></span> Tout supprimer (%d)</button>', $total_all);
+        printf('<label><input type="checkbox" name="coquille_revue_confirm_reset" value="1" required> Supprimer définitivement les %d annotation(s) de ce site (irréversible)</label>', (int) $total_all);
+        printf('<button type="submit" class="button coquille-revue-danger"><span class="dashicons dashicons-trash" aria-hidden="true"></span> Tout supprimer (%d)</button>', (int) $total_all);
         echo '</form>';
     }
     echo '</div>';

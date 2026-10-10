@@ -22,7 +22,7 @@ An open-source WordPress plugin to proofread a website right on its pages: revie
 1. Download the zip of the latest version from [Releases](https://github.com/Atelier-4F-digital/coquille-revue/releases).
 2. In WordPress: **Plugins > Add New Plugin > Upload Plugin**, then activate it.
 
-Requirements: WordPress 5.8+, PHP 7.4+. On multisite, activate it per site or network-wide; each site only sees its own annotations.
+Requirements: WordPress 6.2+, PHP 7.4+. On multisite, activate it per site or network-wide; each site only sees its own annotations.
 
 By default, only logged-in users who can edit posts can annotate. **Public mode** (every visitor, with spam protection) is turned on from the **Coquille Revue** admin page.
 
