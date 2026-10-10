@@ -2,6 +2,30 @@
 
 Toutes les évolutions notables de Coquille Revue. Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/), versions en [SemVer](https://semver.org/lang/fr/).
 
+## [Unreleased]
+
+### Changements incompatibles
+
+- API REST : chaque champ est validé (type, longueur, valeurs permises) avant d'être nettoyé. Une valeur du mauvais type (un tableau à la place d'un texte, par exemple) reçoit une erreur 400 au lieu de faire planter PHP ; un champ trop long reçoit 400 et non plus 413. Le texte d'origine et la suggestion doivent faire au moins 2 caractères.
+- API REST : `PATCH /annotation/{id}/status` exige le paramètre `status` (il valait `applied` par défaut). `GET /annotations` est paginé : `per_page` (100 au plus, 100 par défaut) et `page`, total dans les en-têtes `X-WP-Total` et `X-WP-TotalPages`.
+- WP-CLI : `apply --type=option` ne modifie plus que des options de texte du site : `blogname`, `blogdescription`, `widget_*`, `theme_mods_*`, `options_*` (ACF), liste extensible avec le filtre `coquille_revue_cli_writable_options`. `locate` indique pour chaque option si elle est `modifiable`. `locate` et `apply` refusent un texte d'origine de moins de 2 caractères.
+- E-mail de remerciement : message générique, sans aucun texte saisi par le visiteur (ni nom, ni titre, ni extrait), avec la date, le nom du site et un lien vers l'accueil. L'expéditeur est celui de WordPress (filtres `wp_mail_from` et `wp_mail_from_name`) : plus de `From` ni de `Reply-To` à l'adresse de l'administrateur.
+
+### Ajouts
+
+- Réglage par site « E-mail de remerciement » (activé par défaut), dans la page d'admin, réservé aux administrateurs du site. Coupé, l'e-mail n'est plus demandé aux visiteurs ni enregistré, et les textes de confidentialité sont adaptés. Filtre `coquille_revue_notify_contributor` (`$enabled`, `$row`) pour décider annotation par annotation.
+- Page d'admin : 50 annotations par page avec pagination, colonne « Alertes » (les mêmes que dans les exports pour Claude Code), texte complet du texte d'origine et de la suggestion au survol, confirmation avant « Appliqué » quand un remerciement va partir.
+
+### Sécurité
+
+- Remerciement : au plus 1 e-mail par adresse et par jour, et 20 par jour et par site ; un double clic ou deux appels simultanés sur « Appliqué » n'envoient qu'un e-mail. Il se termine par « Si vous n'êtes pas à l'origine de cette suggestion, ignorez ce message ».
+- Export CSV : une cellule qui commence par `=`, `+`, `-`, `@`, une tabulation ou un retour à la ligne est précédée d'une apostrophe, pour qu'un tableur ne l'exécute pas comme une formule ; les guillemets sont doublés, sans caractère d'échappement.
+- Export Markdown : dans le bloc de données, chaque ligne d'une valeur est décalée de deux espaces ; un visiteur ne peut plus y écrire de fausse ligne `url:`, `auteur:` ou `suggestion:`.
+- Alertes : l'« adresse web » reconnaît aussi `mailto:`, `tel:`, `data:`, `//hôte` et les domaines sans `www` aux extensions courantes (`.ru`, `.co`, `.io`…) ; `apply` refuse l'ajout de ces liens. Les formules de « consigne ou autorité » sont cherchées en français et en anglais, quelle que soit la langue du site.
+- Anti-spam : en plus des limites existantes, au plus 10 envois anonymes par heure et par adresse IP, pour qu'une seule adresse ne puisse pas épuiser le quota du site (30 par heure).
+- Page d'admin : un paramètre d'adresse piégé (`coquille_revue_msg[]=1`, `format[]=…`) ne fait plus planter la page ; les liens ouverts dans un nouvel onglet ont `rel="noopener noreferrer"`.
+- Exports CSV, JSON et Markdown et `wp coquille-revue list` lisent la base par lots de 500 et écrivent au fil de l'eau : la mémoire reste stable quel que soit le nombre d'annotations.
+
 ## [2.5.0] — 2026-10-09 — première version publique
 
 Coquille Revue a d'abord servi en interne chez Atelier 4F Digital, sous le nom « Content Review » (versions 2.0 à 2.4). La 2.5.0 est la première version publiée. Elle change de nom, de préfixes et de table, et n'est pas compatible avec ces versions internes.
