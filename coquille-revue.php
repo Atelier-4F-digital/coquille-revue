@@ -252,6 +252,7 @@ function coquille_revue_overlay_strings() {
         'send'               => 'Envoyer',
         'sending'            => 'Envoi…',
         'sent'               => 'Merci, votre suggestion a été envoyée',
+        'errorEmail'         => 'Adresse e-mail invalide.',
         'errorTooLong'       => 'Votre texte est trop long.',
         'errorRateLimited'   => 'Trop d’envois pour le moment, réessayez dans quelques minutes.',
         'errorLoginRequired' => 'Connectez-vous pour proposer une correction.',
@@ -291,36 +292,40 @@ function coquille_revue_render_overlay() {
     $privacy   = get_privacy_policy_url();
     $ask_email = coquille_revue_thanks_enabled();
     $max       = COQUILLE_REVUE_MAX_LENGTHS;
+    // Icônes : SVG en ligne (pas d'emoji), décoratives, donc masquées aux lecteurs d'écran.
     ?>
     <div id="coquille-revue-root">
-    <div id="coquille-page-dim"></div>
-    <div id="coquille-zone-rect"></div>
-    <div id="coquille-zone-highlight"></div>
+    <div id="coquille-page-dim" aria-hidden="true"></div>
+    <div id="coquille-zone-rect" aria-hidden="true"></div>
+    <div id="coquille-zone-highlight" aria-hidden="true"></div>
 
-    <!-- Icône flottante toujours visible (crayon) -->
-    <button id="coquille-fab" title="Aide-nous à améliorer cette page<?php echo $is_logged ? ' (Alt+Maj+C)' : ''; ?>" aria-label="Mode relecture"<?php echo $is_logged ? ' aria-keyshortcuts="Alt+Shift+C"' : ''; ?>>
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+    <!-- Icône flottante toujours visible (crayon) : bouton à bascule du mode relecture -->
+    <button type="button" id="coquille-fab" aria-label="Mode relecture" aria-pressed="false" aria-describedby="coquille-info-text"<?php echo $is_logged ? ' aria-keyshortcuts="Alt+Shift+C"' : ''; ?>>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
         <path d="M12 20h9"/>
         <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>
       </svg>
     </button>
 
-    <!-- Popover info (apparaît au survol de la FAB) -->
-    <div id="coquille-info-popover" role="dialog" aria-labelledby="coquille-info-title">
-      <h3 id="coquille-info-title">✏️ Aide-nous à améliorer cette page</h3>
-      <p>Vous avez repéré une coquille, un texte à reformuler, ou une zone à améliorer ? Activez le mode relecture pour nous laisser une suggestion directement sur la page.</p>
-      <button class="coquille-info-cta" id="coquille-info-start">✏️ Commencer la relecture</button>
+    <!-- Fenêtre d'information : au survol ou au focus du crayon -->
+    <div id="coquille-info-popover">
+      <p class="coquille-info-title"><svg class="coquille-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg> Aidez-nous à améliorer cette page</p>
+      <p id="coquille-info-text">Vous avez repéré une coquille, un texte à reformuler, ou une zone à améliorer ? Activez le mode relecture pour nous laisser une suggestion directement sur la page.</p>
+      <?php if ($is_logged): ?>
+      <p>Raccourci clavier : <kbd>Alt</kbd> + <kbd>Maj</kbd> + <kbd>C</kbd></p>
+      <?php endif; ?>
+      <button type="button" class="coquille-info-cta" id="coquille-info-start"><svg class="coquille-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg> Commencer la relecture</button>
       <?php if (coquille_revue_show_credit()): ?>
       <div class="coquille-info-credit">
         Plugin <strong>Coquille Revue</strong> · proposé par
-        <a href="<?php echo esc_url(COQUILLE_REVUE_AUTHOR_URL); ?>" target="_blank" rel="noopener noreferrer"><?php echo esc_html(COQUILLE_REVUE_AUTHOR); ?> ↗</a>
+        <a href="<?php echo esc_url(COQUILLE_REVUE_AUTHOR_URL); ?>" target="_blank" rel="noopener noreferrer"><?php echo esc_html(COQUILLE_REVUE_AUTHOR); ?> <span aria-hidden="true">↗</span><span class="coquille-sr-only"> (nouvel onglet)</span></a>
       </div>
       <?php endif; ?>
     </div>
 
     <!-- Barre de contrôles (visible quand mode actif) -->
-    <div id="coquille-bar">
-      <span class="coquille-dot"></span>
+    <div id="coquille-bar" role="region" aria-label="Barre de relecture">
+      <span class="coquille-dot" aria-hidden="true"></span>
       <span id="coquille-label">
         <?php if ($is_logged): ?>
           Mode relecture — connecté en tant que <strong><?php echo esc_html($user_name); ?></strong>
@@ -329,41 +334,46 @@ function coquille_revue_render_overlay() {
         <?php endif; ?>
       </span>
       <span id="coquille-hint">
-        📝 Sélectionnez du texte ou <kbd>clic + glisser</kbd> sur une zone
+        <svg class="coquille-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M4 7V4h16v3"/><path d="M9 20h6"/><path d="M12 4v16"/></svg>
+        <span>Sélectionnez du texte ou <kbd>clic + glisser</kbd> sur une zone<span class="coquille-sr-only">. Au clavier : sélectionnez le texte, puis appuyez sur Entrée</span></span>
       </span>
-      <button id="coquille-stop-btn" title="Quitter le mode relecture">⏹ Arrêter</button>
+      <button type="button" id="coquille-stop-btn"><svg class="coquille-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="6" y="6" width="12" height="12" rx="2"/></svg> Arrêter</button>
     </div>
 
     <!-- Bulle d'annotation -->
-    <div id="coquille-bubble">
+    <div id="coquille-bubble" role="dialog" aria-labelledby="coquille-bubble-title" aria-describedby="coquille-original-text">
       <div id="coquille-bubble-header">
         <span id="coquille-bubble-title">Texte sélectionné</span>
-        <button id="coquille-bubble-close">×</button>
+        <button type="button" id="coquille-bubble-close" aria-label="Fermer"><svg class="coquille-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button>
       </div>
       <div id="coquille-original-text"></div>
       <?php if (!$is_logged): ?>
       <div id="coquille-reviewer-row">
+        <label class="coquille-sr-only" for="coquille-reviewer-name">Votre nom (facultatif)</label>
         <input id="coquille-reviewer-name" type="text" placeholder="Votre nom (facultatif)" maxlength="<?php echo (int) $max['reviewerName']; ?>" autocomplete="name">
         <?php if ($ask_email): ?>
-        <input id="coquille-reviewer-email" type="email" placeholder="Votre email (facultatif — pour qu’on vous prévienne)" maxlength="<?php echo (int) $max['reviewerEmail']; ?>" autocomplete="email">
+        <label class="coquille-sr-only" for="coquille-reviewer-email">Votre e-mail (facultatif)</label>
+        <input id="coquille-reviewer-email" type="email" placeholder="Votre e-mail (facultatif)" maxlength="<?php echo (int) $max['reviewerEmail']; ?>" autocomplete="email">
         <?php endif; ?>
       </div>
       <?php endif; ?>
-      <p id="coquille-privacy"><?php if ($ask_email): ?>Nom et e-mail facultatifs. L'e-mail sert uniquement à vous prévenir quand votre suggestion est appliquée, puis il est effacé.<?php else: ?>Nom facultatif.<?php endif; ?> L'adresse IP est conservée <?php echo (int) COQUILLE_REVUE_IP_RETENTION_DAYS; ?> jours contre le spam. Les suggestions peuvent être traitées avec un assistant IA.<?php if ($privacy): ?> <a href="<?php echo esc_url($privacy); ?>" target="_blank" rel="noopener noreferrer">Confidentialité</a><?php endif; ?></p>
-      <textarea id="coquille-textarea" placeholder="Votre suggestion… (Entrée pour envoyer, Maj+Entrée pour saut de ligne, Échap pour annuler)" maxlength="<?php echo (int) COQUILLE_REVUE_MAX_TEXT_LENGTH; ?>"></textarea>
-      <div id="coquille-type-row">
-        <button class="coquille-type-btn coquille-active" data-type="correction">✏️ Correction</button>
-        <button class="coquille-type-btn" data-type="suggestion">💡 Suggestion</button>
-        <button class="coquille-type-btn" data-type="question">❓ Question</button>
+      <p id="coquille-privacy"><?php if ($is_logged): ?>Votre suggestion est enregistrée avec votre nom de compte.<?php elseif ($ask_email): ?>Nom et e-mail facultatifs. L'e-mail sert uniquement à vous prévenir quand votre suggestion est appliquée, puis il est effacé.<?php else: ?>Nom facultatif.<?php endif; ?> L'adresse IP est conservée <?php echo (int) COQUILLE_REVUE_IP_RETENTION_DAYS; ?> jours contre le spam. Les suggestions peuvent être traitées avec un assistant IA.<?php if ($privacy): ?> <a href="<?php echo esc_url($privacy); ?>" target="_blank" rel="noopener noreferrer">Confidentialité<span class="coquille-sr-only"> (nouvel onglet)</span></a><?php endif; ?></p>
+      <label class="coquille-sr-only" for="coquille-textarea">Votre suggestion</label>
+      <textarea id="coquille-textarea" placeholder="Votre suggestion…" aria-describedby="coquille-textarea-help" maxlength="<?php echo (int) COQUILLE_REVUE_MAX_TEXT_LENGTH; ?>"></textarea>
+      <p id="coquille-textarea-help">Entrée pour envoyer · Maj+Entrée pour aller à la ligne · Échap pour annuler</p>
+      <div id="coquille-type-row" role="group" aria-label="Type de remarque">
+        <button type="button" class="coquille-type-btn" data-type="correction" aria-pressed="true"><svg class="coquille-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg> Correction</button>
+        <button type="button" class="coquille-type-btn" data-type="suggestion" aria-pressed="false"><svg class="coquille-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M9 18h6"/><path d="M10 22h4"/><path d="M12 2a7 7 0 0 0-4 12.74V16h8v-1.26A7 7 0 0 0 12 2z"/></svg> Suggestion</button>
+        <button type="button" class="coquille-type-btn" data-type="question" aria-pressed="false"><svg class="coquille-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg> Question</button>
       </div>
       <input id="coquille-hp" type="text" tabindex="-1" autocomplete="off" aria-hidden="true">
       <div id="coquille-actions">
-        <button id="coquille-send-btn">Envoyer</button>
-        <button id="coquille-cancel-btn">Annuler</button>
+        <button type="button" id="coquille-send-btn">Envoyer</button>
+        <button type="button" id="coquille-cancel-btn">Annuler</button>
       </div>
     </div>
 
-    <div id="coquille-toast"></div>
+    <div id="coquille-toast" role="status" aria-live="polite" aria-atomic="true"></div>
     </div>
     <?php
 }

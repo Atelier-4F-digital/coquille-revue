@@ -19,6 +19,7 @@
   const fab          = document.getElementById('coquille-fab');
   const infoPop      = document.getElementById('coquille-info-popover');
   const infoStartBtn = document.getElementById('coquille-info-start');
+  const bar          = document.getElementById('coquille-bar');
   const stopBtn      = document.getElementById('coquille-stop-btn');
   const bubble       = document.getElementById('coquille-bubble');
   const bubbleTitle  = document.getElementById('coquille-bubble-title');
@@ -117,51 +118,84 @@
     bubble.style.right = 'auto';
   }
 
+  // Message annoncé par la zone role="status" ; le texte est vidé une fois le message masqué.
+  let toastTimer = null;
   function showToast(msg, type) {
+    clearTimeout(toastTimer);
     toast.textContent = msg;
     toast.className = 'coquille-show coquille-' + type;
-    setTimeout(() => { toast.className = ''; }, 3000);
+    toastTimer = setTimeout(() => {
+      toast.className = '';
+      toastTimer = setTimeout(() => { toast.textContent = ''; }, 300);
+    }, type === 'error' ? 6000 : 3000);
+  }
+
+  // Le focus qui était dans la bulle ou la barre revient au crayon quand elles disparaissent ;
+  // après un clic ailleurs dans la page, il reste là où la personne a cliqué.
+  function focusIsIn(...els) {
+    return els.some(el => el.contains(document.activeElement));
+  }
+  let restoringFocus = false; // focus rendu par le script : n'ouvre pas la fenêtre d'information
+  function focusFab() {
+    restoringFocus = true;
+    fab.focus({ preventScroll: true });
+    restoringFocus = false;
   }
 
   function closeBubble() {
+    const hadFocus = focusIsIn(bubble);
     bubble.classList.remove('coquille-visible');
     zoneHL.classList.remove('coquille-visible');
     currentAnnotation = null;
     textarea.value = '';
-    reviewerEmail?.classList.remove('coquille-invalid');
+    reviewerEmail?.removeAttribute('aria-invalid');
+    if (hadFocus) focusFab();
   }
 
   function enterReviewMode() {
     reviewModeActive = true;
     lastOverText = null;
     document.body.classList.add('coquille-mode-active', 'coquille-cursor-text');
-    fab.classList.add('coquille-active');
+    fab.setAttribute('aria-pressed', 'true');
     infoPop.classList.remove('coquille-visible');
   }
 
   function exitReviewMode() {
+    const hadFocus = focusIsIn(bubble, bar);
     reviewModeActive = false;
     document.body.classList.remove('coquille-mode-active', 'coquille-cursor-text', 'coquille-cursor-zone');
-    fab.classList.remove('coquille-active');
+    fab.setAttribute('aria-pressed', 'false');
     zoneRect.classList.remove('coquille-drawing');
     smartDrag = null;
     closeBubble();
+    if (hadFocus) focusFab();
   }
 
-  // ── FAB : popover au hover, click lance la relecture ────────────────
+  // ── FAB : popover au survol ou au focus, clic lance la relecture ─────
   let popoverHideTimer = null;
   function showPopover() {
     clearTimeout(popoverHideTimer);
     if (!reviewModeActive) infoPop.classList.add('coquille-visible');
   }
+  // Ouverte au clavier, la fenêtre reste affichée tant que le focus est sur le crayon ou dans la fenêtre.
+  function keyboardFocusOnFab() {
+    try { return fab.matches(':focus-visible'); } catch (e) { return false; }
+  }
   function hidePopoverDelayed() {
     clearTimeout(popoverHideTimer);
-    popoverHideTimer = setTimeout(() => infoPop.classList.remove('coquille-visible'), 220);
+    popoverHideTimer = setTimeout(() => {
+      if (!focusIsIn(infoPop) && !keyboardFocusOnFab()) infoPop.classList.remove('coquille-visible');
+    }, 220);
   }
   fab.addEventListener('mouseenter', showPopover);
   fab.addEventListener('mouseleave', hidePopoverDelayed);
   infoPop.addEventListener('mouseenter', showPopover);
   infoPop.addEventListener('mouseleave', hidePopoverDelayed);
+  fab.addEventListener('focus', () => { if (!restoringFocus) showPopover(); });
+  // Le focus peut passer du crayon à la fenêtre (Tab) sans la fermer.
+  [fab, infoPop].forEach(el => el.addEventListener('focusout', (e) => {
+    if (!infoPop.contains(e.relatedTarget) && e.relatedTarget !== fab) infoPop.classList.remove('coquille-visible');
+  }));
 
   fab.addEventListener('click', (e) => {
     e.stopPropagation();
@@ -174,8 +208,9 @@
     clearTimeout(popoverHideTimer);
     infoPop.classList.remove('coquille-visible');
     enterReviewMode();
+    focusFab(); // le bouton disparaît avec la fenêtre : le focus revient au crayon
   });
-  stopBtn.addEventListener('click', exitReviewMode);
+  stopBtn.addEventListener('click', () => exitReviewMode());
 
   // ── Capture sélection texte ──────────────────────────────────────────
   function captureTextSelection(clientX) {
@@ -341,10 +376,10 @@
   });
 
   // ── Type d'annotation ────────────────────────────────────────────────
-  document.querySelectorAll('.coquille-type-btn').forEach(btn => {
+  const typeButtons = document.querySelectorAll('.coquille-type-btn');
+  typeButtons.forEach(btn => {
     btn.addEventListener('click', () => {
-      document.querySelectorAll('.coquille-type-btn').forEach(b => b.classList.remove('coquille-active'));
-      btn.classList.add('coquille-active');
+      typeButtons.forEach(b => b.setAttribute('aria-pressed', String(b === btn)));
       activeType = btn.dataset.type;
     });
   });
@@ -374,12 +409,13 @@
 
     // Validation email côté client (si renseigné)
     if (payload.reviewerEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(payload.reviewerEmail)) {
-      reviewerEmail.classList.add('coquille-invalid');
+      reviewerEmail.setAttribute('aria-invalid', 'true');
       reviewerEmail.focus();
+      showToast(t.errorEmail, 'error');
       sending = false;
       return false;
     }
-    reviewerEmail?.classList.remove('coquille-invalid');
+    reviewerEmail?.removeAttribute('aria-invalid');
 
     sendBtn.disabled = true;
     sendBtn.textContent = t.sending;
@@ -396,11 +432,11 @@
         const messages = { 413: t.errorTooLong, 429: t.errorRateLimited, 401: t.errorLoginRequired, 403: t.errorForbidden };
         throw new Error(messages[res.status] || err.message || fmt(t.errorGeneric, res.status));
       }
-      showToast('✓ ' + t.sent, 'success');
+      showToast(t.sent, 'success');
       exitReviewMode(); // sortie automatique du mode après envoi réussi
       return true;
     } catch (err) {
-      showToast('✗ ' + err.message, 'error');
+      showToast(err.message, 'error');
       return false;
     } finally {
       sending = false;
@@ -418,14 +454,27 @@
     }
   });
 
-  cancelBtn.addEventListener('click', closeBubble);
-  document.getElementById('coquille-bubble-close').addEventListener('click', closeBubble);
+  cancelBtn.addEventListener('click', () => closeBubble());
+  document.getElementById('coquille-bubble-close').addEventListener('click', () => closeBubble());
 
   document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') {
+    // Échap déjà utilisé par le thème (menu, fenêtre) : on n'y touche pas.
+    if (e.key === 'Escape' && !e.defaultPrevented) {
       if (bubble.classList.contains('coquille-visible')) closeBubble();
       else if (reviewModeActive) exitReviewMode();
-      else if (infoPop.classList.contains('coquille-visible')) infoPop.classList.remove('coquille-visible');
+      else if (infoPop.classList.contains('coquille-visible')) {
+        const hadFocus = focusIsIn(infoPop);
+        infoPop.classList.remove('coquille-visible');
+        if (hadFocus) focusFab();
+      }
+    }
+    // Annotation au clavier : en mode relecture, une sélection faite au clavier (navigation au curseur, F7) puis Entrée.
+    if (e.key === 'Enter' && reviewModeActive && !bubble.classList.contains('coquille-visible') && !isPluginEl(e.target) && !isTyping(e.target)) {
+      const sel = window.getSelection();
+      if (sel && !sel.isCollapsed && !isPluginEl(sel.anchorNode && sel.anchorNode.parentElement)) {
+        const r = sel.getRangeAt(0).getBoundingClientRect();
+        if (captureTextSelection(r.left + r.width / 2)) e.preventDefault();
+      }
     }
     // Alt+Maj+C (Option+Maj+C sur Mac, d'où e.code) : personnes connectées seulement, jamais pendant une saisie.
     if (cfg.shortcut && e.altKey && e.shiftKey && !e.ctrlKey && !e.metaKey && e.code === 'KeyC' && !isTyping(e.target)) {
