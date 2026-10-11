@@ -110,6 +110,13 @@ function coquille_revue_table() {
     return $wpdb->base_prefix . 'coquille_revue_annotations';
 }
 
+// Dates enregistrées en UTC (created_at, applied_at), affichées et exportées à l'heure du site, traduites.
+// Les annotations antérieures à la version 2.6.0 ont été datées à l'heure du serveur MySQL.
+function coquille_revue_local_date($utc, $format = 'Y-m-d H:i:s') {
+    $time = $utc ? strtotime($utc . ' UTC') : false;
+    return $time ? (string) wp_date($format, $time) : '';
+}
+
 function coquille_revue_create_table() {
     global $wpdb;
     $table   = coquille_revue_table();
@@ -233,10 +240,10 @@ function coquille_revue_unschedule_events() {
 add_action('coquille_revue_purge_personal_data', function () {
     global $wpdb;
     $table = coquille_revue_table();
-    // created_at est posé par l'horloge MySQL (CURRENT_TIMESTAMP) : on compare avec la même horloge.
+    // created_at est en UTC (coquille_revue_save_annotation) : on compare avec l'heure UTC de MySQL.
     // phpcs:ignore WordPress.DB.DirectDatabaseQuery -- plugin table, daily purge of personal data.
     $wpdb->query($wpdb->prepare(
-        'UPDATE %i SET reviewer_ip = NULL, user_agent = NULL WHERE reviewer_ip IS NOT NULL AND created_at < DATE_SUB(NOW(), INTERVAL %d DAY)',
+        'UPDATE %i SET reviewer_ip = NULL, user_agent = NULL WHERE reviewer_ip IS NOT NULL AND created_at < DATE_SUB(UTC_TIMESTAMP(), INTERVAL %d DAY)',
         $table, COQUILLE_REVUE_IP_RETENTION_DAYS
     ));
     // E-mail et nom : inutiles une fois l'annotation traitée (le remerciement est déjà parti), effacés au plus tard après 6 mois.
@@ -245,7 +252,7 @@ add_action('coquille_revue_purge_personal_data', function () {
     $wpdb->query($wpdb->prepare(
         "UPDATE %i SET reviewer_email = NULL, reviewer_name = NULL, author_name = IF(author_id = 0, '', author_name)
          WHERE (reviewer_email IS NOT NULL OR reviewer_name IS NOT NULL)
-           AND (status IN ('applied', 'rejected', 'archived') OR created_at < DATE_SUB(NOW(), INTERVAL %d DAY))",
+           AND (status IN ('applied', 'rejected', 'archived') OR created_at < DATE_SUB(UTC_TIMESTAMP(), INTERVAL %d DAY))",
         $table, COQUILLE_REVUE_EMAIL_RETENTION_DAYS
     ));
     if (is_multisite()) {
@@ -714,6 +721,7 @@ function coquille_revue_save_annotation(WP_REST_Request $request) {
         'reviewer_email'  => $reviewer_email,
         'reviewer_ip'     => $ip,
         'status'          => 'pending',
+        'created_at'      => current_time('mysql', true),
     ]);
 
     if (!$ok) {
@@ -820,7 +828,7 @@ function coquille_revue_set_status($id, $status) {
     // phpcs:ignore WordPress.DB.DirectDatabaseQuery -- plugin table, atomic update that guards the thank-you e-mail.
     if ($status === 'applied' && $wpdb->query($wpdb->prepare(
         'UPDATE %i SET status = %s, applied_at = %s WHERE id = %d AND blog_id = %d AND applied_at IS NULL',
-        $table, $status, current_time('mysql'), $id, $blog
+        $table, $status, current_time('mysql', true), $id, $blog
     ))) {
         $notified = coquille_revue_notify_contributor($row);
     } else {
@@ -898,7 +906,7 @@ function coquille_revue_notify_contributor($row) {
     // L'expéditeur reste celui de WordPress (filtres wp_mail_from et wp_mail_from_name).
     $switched  = switch_to_locale(get_locale());
     $site_name = wp_specialchars_decode(get_bloginfo('name'), ENT_QUOTES);
-    $date      = (string) mysql2date(get_option('date_format'), $row['created_at']);
+    $date      = coquille_revue_local_date($row['created_at'], get_option('date_format'));
 
     $body  = __('Hello,', 'coquille-revue') . "\n\n";
     /* translators: 1: date of the suggestion, 2: site name */
@@ -960,12 +968,19 @@ add_filter('wp_privacy_personal_data_erasers', function ($erasers) {
     return $erasers;
 });
 
+// Compte WordPress qui porte cette adresse (0 sinon) : ses annotations sont à lui même quand l'e-mail n'y est pas
+// enregistré (remerciement coupé, compte non membre du site, ou e-mail effacé après le traitement de l'annotation).
+function coquille_revue_privacy_user_id($email) {
+    $user = get_user_by('email', $email);
+    return $user ? (int) $user->ID : 0;
+}
+
 function coquille_revue_privacy_export($email, $page = 1) {
     global $wpdb;
     // phpcs:ignore WordPress.DB.DirectDatabaseQuery -- plugin table, WordPress personal data export.
     $rows = $wpdb->get_results($wpdb->prepare(
-        'SELECT * FROM %i WHERE blog_id = %d AND reviewer_email = %s',
-        coquille_revue_table(), get_current_blog_id(), $email
+        'SELECT * FROM %i WHERE blog_id = %d AND (reviewer_email = %s OR (author_id > 0 AND author_id = %d))',
+        coquille_revue_table(), get_current_blog_id(), $email, coquille_revue_privacy_user_id($email)
     ), ARRAY_A);
     $items = [];
     foreach ($rows as $r) {
@@ -977,10 +992,10 @@ function coquille_revue_privacy_export($email, $page = 1) {
                 ['name' => __('Page', 'coquille-revue'), 'value' => $r['url']],
                 ['name' => __('Original text', 'coquille-revue'), 'value' => $r['original_text']],
                 ['name' => _x('Suggestion', 'proposed text', 'coquille-revue'), 'value' => $r['suggestion']],
-                ['name' => __('Name', 'coquille-revue'), 'value' => (string) $r['reviewer_name']],
+                ['name' => __('Name', 'coquille-revue'), 'value' => (string) ($r['reviewer_name'] ?? $r['author_name'])],
                 ['name' => __('Email', 'coquille-revue'), 'value' => (string) $r['reviewer_email']],
                 ['name' => __('IP address', 'coquille-revue'), 'value' => (string) $r['reviewer_ip']],
-                ['name' => __('Date', 'coquille-revue'), 'value' => $r['created_at']],
+                ['name' => __('Date', 'coquille-revue'), 'value' => coquille_revue_local_date($r['created_at'])],
             ],
         ];
     }
@@ -992,8 +1007,9 @@ function coquille_revue_privacy_erase($email, $page = 1) {
     global $wpdb;
     // phpcs:ignore WordPress.DB.DirectDatabaseQuery -- plugin table, WordPress personal data erasure.
     $count = $wpdb->query($wpdb->prepare(
-        "UPDATE %i SET reviewer_email = NULL, reviewer_name = NULL, reviewer_ip = NULL, user_agent = NULL, author_id = 0, author_name = '' WHERE blog_id = %d AND reviewer_email = %s",
-        coquille_revue_table(), get_current_blog_id(), $email
+        "UPDATE %i SET reviewer_email = NULL, reviewer_name = NULL, reviewer_ip = NULL, user_agent = NULL, author_id = 0, author_name = ''
+         WHERE blog_id = %d AND (reviewer_email = %s OR (author_id > 0 AND author_id = %d))",
+        coquille_revue_table(), get_current_blog_id(), $email, coquille_revue_privacy_user_id($email)
     ));
     return [
         'items_removed'  => (int) $count,
@@ -1139,7 +1155,7 @@ function coquille_revue_handle_export() {
                         $r['annotation_mode'] ?? 'text', $r['type'],
                         $r['original_text'], $r['suggestion'], $r['xpath'],
                         coquille_revue_author_label($r), $r['reviewer_ip'] ?? '',
-                        $r['status'], $r['created_at']
+                        $r['status'], coquille_revue_local_date($r['created_at']),
                     ]);
                 }
             }
@@ -1301,9 +1317,14 @@ function coquille_revue_claude_code_instructions() {
     return implode(' ', array_map(fn($i, $r) => '(' . ($i + 1) . ') ' . $r, array_keys($rules), $rules));
 }
 
-// Une annotation telle qu'exportée pour Claude Code : jamais d'e-mail, d'IP ni de navigateur.
+// Une annotation telle qu'exportée pour Claude Code : jamais d'e-mail, d'IP ni de navigateur ; dates à l'heure du site.
 function coquille_revue_json_row($row) {
     unset($row['reviewer_email'], $row['reviewer_ip'], $row['user_agent'], $row['will_notify']);
+    foreach (['created_at', 'applied_at'] as $date) {
+        if (!empty($row[$date])) {
+            $row[$date] = coquille_revue_local_date($row[$date]);
+        }
+    }
     $row['source'] = coquille_revue_annotation_source($row);
     $row['alerts'] = coquille_revue_annotation_alerts($row);
     return $row;
@@ -1425,7 +1446,7 @@ function coquille_revue_markdown_row($r) {
     $mode  = ($r['annotation_mode'] ?? '') === 'zone' ? 'zone' : 'text';
     $type  = in_array($r['type'], ['correction', 'suggestion', 'question'], true) ? $r['type'] : 'correction';
     $data  = 'page_title: ' . $value($r['page_title']) . "\nurl: " . $value($r['url']) . "\nauthor: " . $value($r['author_name'])
-        . "\ndate: " . $value($r['created_at']) . "\ncss_selector: " . $value($r['css_selector']) . "\nxpath: " . $value($r['xpath'])
+        . "\ndate: " . $value(coquille_revue_local_date($r['created_at'])) . "\ncss_selector: " . $value($r['css_selector']) . "\nxpath: " . $value($r['xpath'])
         . "\noriginal_text:\n  " . $value($r['original_text']) . "\nsuggestion:\n  " . $value($r['suggestion']) . "\n";
     if ($mode === 'zone' && !empty($r['zone_data'])) {
         $zd = json_decode($r['zone_data'], true);
@@ -2250,7 +2271,7 @@ function coquille_revue_admin_page() {
             }
             echo '</td>';
             printf('<td><span class="coquille-status coquille-status--%s">%s</span></td>', esc_attr($row['status']), esc_html($labels[$row['status']] ?? $row['status']));
-            printf('<td class="coquille-revue-muted">%s</td>', esc_html(mysql2date($date_format, $row['created_at'])));
+            printf('<td class="coquille-revue-muted">%s</td>', esc_html(coquille_revue_local_date($row['created_at'], $date_format)));
             echo '<td>';
             coquille_revue_render_row_actions((int) $row['id'], $row['status'], $filter, $paged, !empty($row['will_notify']));
             echo '</td></tr>';

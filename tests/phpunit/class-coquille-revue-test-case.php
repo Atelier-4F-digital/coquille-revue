@@ -67,6 +67,7 @@ abstract class Coquille_Revue_Test_Case extends WP_UnitTestCase {
             'reviewer_email'  => null,
             'reviewer_ip'     => '192.0.2.10',
             'status'          => 'pending',
+            'created_at'      => current_time('mysql', true),
         ], $fields));
         return (int) $wpdb->insert_id;
     }

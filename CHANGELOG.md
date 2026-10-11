@@ -45,6 +45,7 @@ All notable changes to Coquille Revue. Format based on [Keep a Changelog](https:
 
 ### Changed
 
+- Dates: `created_at` and `applied_at` are stored in UTC, and shown in the site time zone on the admin page, in the exports, in the thank-you email and in the personal data export. `created_at` came from the clock of the MySQL server and `applied_at` from the site time zone, so an annotation could look applied before it was created, and every date was shifted when MySQL and WordPress use different time zones. Annotations created before 2.6.0 keep the time of the MySQL server (nothing changes when it runs in UTC, as on most hosts).
 - The thank-you email and the digest email to the administrator are sent in the site language, whatever the language of the person whose action triggers them.
 - Admin page: status, type and mode labels are translated (the stored values do not change), dates use a translatable format and numbers the number format of the language. Alerts are shown with translated labels.
 - `wp coquille-revue locate` gives the status of each post where the text is found (a draft or a private post is not what visitors saw). When the text appears several times at one location, `apply --all --dry-run` shows an excerpt of each occurrence (`each_occurrence`), so that the user sees every place before replacing them all. `apply` no longer needs the PHP mbstring extension to build its report.
@@ -85,6 +86,7 @@ All notable changes to Coquille Revue. Format based on [Keep a Changelog](https:
   - `style=` attributes are refused like `on…=` ones;
   - a tag, an HTML comment, a link or a shortcode of the replacement text must appear verbatim in the original text: a link swapped for another one is refused, not only an extra one;
   - a text that the checks cannot read is refused.
+- Personal data: the WordPress export and erasure tools also find the annotations of the account that holds the email address, even when the email is not stored with them (thank-you email off, account that is not a member of the site, email already deleted once the annotation was processed); the export shows the display name of the account.
 - Anti-spam: an IPv4 address written as IPv6 (`::ffff:a.b.c.d`, given by some dual-stack servers) keeps its own limit; all IPv4 visitors used to share one counter, so a single one of them could block everyone else.
 - REST API: each element name of the XPath is limited to 64 characters (a longer one is a sentence written with hyphens).
 - When the thank-you email is off, the account email of a logged-in user is no longer stored either: it only serves that email.

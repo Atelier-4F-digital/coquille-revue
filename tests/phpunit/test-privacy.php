@@ -45,9 +45,10 @@ class Test_Coquille_Revue_Privacy extends Coquille_Revue_Test_Case {
 
     public function test_daily_purge() {
         global $wpdb;
-        // created_at follows the MySQL clock, like the purge.
-        $old     = $wpdb->get_var($wpdb->prepare('SELECT DATE_SUB(NOW(), INTERVAL %d DAY)', COQUILLE_REVUE_IP_RETENTION_DAYS + 1));
-        $ancient = $wpdb->get_var($wpdb->prepare('SELECT DATE_SUB(NOW(), INTERVAL %d DAY)', COQUILLE_REVUE_EMAIL_RETENTION_DAYS + 1));
+        // created_at is in UTC, like the purge.
+        $old     = gmdate('Y-m-d H:i:s', time() - (COQUILLE_REVUE_IP_RETENTION_DAYS * DAY_IN_SECONDS + HOUR_IN_SECONDS));
+        $ancient = gmdate('Y-m-d H:i:s', time() - (COQUILLE_REVUE_EMAIL_RETENTION_DAYS * DAY_IN_SECONDS + HOUR_IN_SECONDS));
+        $edge    = $this->insert_annotation(['reviewer_email' => 'e@example.org', 'created_at' => gmdate('Y-m-d H:i:s', time() - (COQUILLE_REVUE_IP_RETENTION_DAYS * DAY_IN_SECONDS - HOUR_IN_SECONDS))]);
         $recent  = $this->insert_annotation(['reviewer_email' => 'a@example.org']);
         $ip_old  = $this->insert_annotation(['reviewer_email' => 'b@example.org', 'created_at' => $old]);
         $done    = $this->insert_annotation(['reviewer_email' => 'c@example.org', 'status' => 'applied']);
@@ -57,12 +58,51 @@ class Test_Coquille_Revue_Privacy extends Coquille_Revue_Test_Case {
 
         $row = $this->get_annotation($recent);
         $this->assertSame(['a@example.org', 'Marie', '192.0.2.10'], [$row['reviewer_email'], $row['reviewer_name'], $row['reviewer_ip']]);
+        $this->assertSame('192.0.2.10', $this->get_annotation($edge)['reviewer_ip'], 'one hour before the limit, whatever the MySQL time zone');
         $row = $this->get_annotation($ip_old);
         $this->assertSame(['b@example.org', null], [$row['reviewer_email'], $row['reviewer_ip']]);
         foreach ([$done, $expired] as $id) {
             $row = $this->get_annotation($id);
             $this->assertSame([null, null, ''], [$row['reviewer_email'], $row['reviewer_name'], $row['author_name']]);
         }
+    }
+
+    public function test_export_and_erasure_find_the_annotations_of_an_account_without_its_email() {
+        $user  = self::factory()->user->create(['user_email' => 'jeanne@example.org', 'display_name' => 'Jeanne']);
+        $other = self::factory()->user->create();
+        // Processed annotation: the purge has removed the email, the account and its name stay.
+        $id   = $this->insert_annotation(['author_id' => $user, 'author_name' => 'Jeanne', 'reviewer_name' => null, 'reviewer_email' => null, 'status' => 'applied']);
+        $kept = $this->insert_annotation(['author_id' => $other, 'author_name' => 'Paul', 'reviewer_name' => null]);
+
+        $export = coquille_revue_privacy_export('jeanne@example.org');
+        $this->assertCount(1, $export['data']);
+        $this->assertSame('coquille-revue-' . $id, $export['data'][0]['item_id']);
+        $this->assertContains('Jeanne', array_column($export['data'][0]['data'], 'value'));
+
+        $this->assertSame(1, coquille_revue_privacy_erase('jeanne@example.org')['items_removed']);
+        $row = $this->get_annotation($id);
+        $this->assertSame(['0', '', null], [$row['author_id'], $row['author_name'], $row['reviewer_ip']]);
+        $this->assertSame('Paul', $this->get_annotation($kept)['author_name']);
+        $this->assertSame([], coquille_revue_privacy_export('nobody@example.org')['data']);
+    }
+
+    public function test_dates_are_stored_in_utc_and_shown_in_the_site_time_zone() {
+        update_option('timezone_string', 'Asia/Tokyo');
+        $this->set_public_mode();
+        $this->assertSame(201, $this->post_annotation(['reviewerEmail' => 'marie@example.org'])->get_status());
+        $row = $this->last_annotation();
+        $this->assertEqualsWithDelta(time(), strtotime($row['created_at'] . ' UTC'), 120);
+
+        coquille_revue_set_status((int) $row['id'], 'applied');
+        $row = $this->get_annotation((int) $row['id']);
+        $this->assertEqualsWithDelta(strtotime($row['created_at'] . ' UTC'), strtotime($row['applied_at'] . ' UTC'), 120, 'same clock for both dates');
+
+        $local = wp_date('Y-m-d H:i:s', strtotime($row['created_at'] . ' UTC'));
+        $this->assertNotSame($row['created_at'], $local);
+        $json = coquille_revue_json_row($row);
+        $this->assertSame($local, $json['created_at']);
+        $this->assertStringContainsString("date: {$local}", coquille_revue_markdown_row($row));
+        $this->assertContains($local, array_column(coquille_revue_privacy_export('marie@example.org')['data'][0]['data'], 'value'));
     }
 
     public function test_purge_keeps_the_name_of_logged_in_authors() {
