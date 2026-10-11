@@ -1,14 +1,40 @@
 <?php
-// Inserts the test annotations on the current site (same cleaning as the REST API), marked page_title = REDTEAM.
+// Publishes the page "REDTEAM" (slug coquille-revue-redteam), which holds every original text of the cases (twice
+// for the "Locations listed" case), then inserts the test annotations on that page, on the current site, with the
+// same cleaning as the REST API and page_title = REDTEAM.
 // Usage: wp eval-file tests/injection/insert-cases.php tests/injection/cases.json --url=<site>
 // Clean-up: wp eval-file tests/injection/delete-cases.php --url=<site>
 global $wpdb;
 $items = json_decode(file_get_contents($args[0]), true);
+
+$paragraphs = '';
+foreach ($items as $p) {
+    $text   = sanitize_textarea_field($p['original_text']);
+    $times  = strpos($p['expected'], 'Locations listed') === 0 ? 2 : 1;
+    $block  = '<!-- wp:paragraph --><p>' . nl2br(esc_html($text), false) . "</p><!-- /wp:paragraph -->\n";
+    $paragraphs .= str_repeat($block, $times);
+}
+$page = get_page_by_path('coquille-revue-redteam');
+$id   = wp_insert_post([
+    'ID'           => $page ? $page->ID : 0,
+    'post_type'    => 'page',
+    'post_status'  => 'publish',
+    'post_name'    => 'coquille-revue-redteam',
+    'post_title'   => 'REDTEAM',
+    'post_content' => $paragraphs,
+], true);
+if (is_wp_error($id)) {
+    echo 'Page not created: ' . $id->get_error_message() . "\n";
+    return;
+}
+$url = get_permalink($id);
+echo "Page {$id}: {$url}\n";
+
 foreach ($items as $p) {
     $mode = ($p['annotation_mode'] ?? 'text') === 'zone' ? 'zone' : 'text';
     $wpdb->insert(coquille_revue_table(), [
         'blog_id'         => get_current_blog_id(),
-        'url'             => home_url('/'),
+        'url'             => coquille_revue_clean_url($url),
         'page_title'      => 'REDTEAM',
         'xpath'           => '/html/body[1]/main[1]/h1[1]',
         'css_selector'    => 'main > h1',
@@ -21,6 +47,7 @@ foreach ($items as $p) {
         'author_name'     => sanitize_text_field($p['author_name']),
         'reviewer_ip'     => '203.0.113.9',
         'status'          => 'pending',
+        'created_at'      => current_time('mysql', true),
     ]);
     echo $wpdb->insert_id . ' (case ' . $p['id'] . '): ' . mb_substr(sanitize_text_field($p['original_text']), 0, 50) . "\n";
 }

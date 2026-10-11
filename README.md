@@ -75,9 +75,10 @@ Les annotations sont du texte écrit par des visiteurs, souvent anonymes : l'ext
 - **Aucune application automatique.** Claude Code montre chaque changement et attend votre accord, annotation par annotation. Il ne place jamais le texte d'une annotation dans une ligne de commande : les commandes WP-CLI le lisent directement dans la base.
 - **Alertes automatiques**, calculées sans IA, sur chaque annotation : adresse web, code (dont shortcodes), caractères invisibles, alphabets mélangés, formules de consigne ou d'autorité en français et en anglais. Dans les exports, ce sont des codes fixes (`web_address`, `code_or_command`, `invisible_characters`, `mixed_scripts`, `instruction_or_authority`, et `unreadable_text` pour un texte que les contrôles ne peuvent pas lire).
 - **Consignes pour Claude Code en anglais fixe** : elles ne passent jamais par les traductions, qui ne peuvent donc pas les affaiblir.
-- **Anti-spam** en mode public : champ piège, limites par adresse IP (bloc entier en IPv6), par compte et par site.
+- **Anti-spam** en mode public : champ piège ; par adresse IP (bloc /64 entier en IPv6), au plus 5 envois en 5 minutes et 10 par heure ; par compte, 60 en 5 minutes ; pour le site, 30 envois anonymes par heure.
+- **E-mail de remerciement** : message générique (nom du site, date, lien vers l'accueil), sans rien du texte saisi par le visiteur ; au plus 1 par adresse et par jour, et 20 par site et par jour.
 - **Cloisonnement multisite** et **droits** : un site ne voit, n'exporte et ne supprime que ses annotations ; les contributeurs et auteurs n'y ont pas accès.
-- Les règles ont été éprouvées par des tests d'injection de prompt (annotations piégées, voir [tests/injection](tests/injection/)) avant publication.
+- Les règles sont éprouvées par un kit de tests d'injection de prompt (annotations piégées, voir [tests/injection](tests/injection/)), à rejouer avant chaque publication.
 
 Vous avez trouvé une faille ? Merci de la signaler en privé : voir [SECURITY.md](SECURITY.md).
 
@@ -87,6 +88,13 @@ Vous avez trouvé une faille ? Merci de la signaler en privé : voir [SECURITY.m
 - **Visible** : texte, suggestion et nom pour les éditeurs et administrateurs ; adresse IP pour les administrateurs (page d'admin, export CSV). L'e-mail n'est affiché nulle part : il sert au remerciement et aux outils RGPD de WordPress. L'e-mail et l'IP ne sont **jamais** transmis à Claude Code.
 - **Durées** : l'adresse IP est effacée au bout de 30 jours ; l'e-mail et le nom d'un visiteur dans les 24 heures qui suivent le traitement de l'annotation (appliquée, rejetée ou archivée), et au plus tard au bout de 6 mois.
 - **Outils WordPress** : un texte est proposé pour votre politique de confidentialité (**Réglages > Confidentialité**), et les demandes d'export ou d'effacement de données (**Outils**) prennent en compte les annotations.
+
+## Bon à savoir
+
+- **Raccourci clavier** : <kbd>Alt</kbd>+<kbd>Maj</kbd>+<kbd>C</kbd> (<kbd>Option</kbd>+<kbd>Maj</kbd>+<kbd>C</kbd> sur Mac) ouvre et ferme le mode relecture, pour les personnes connectées. Au clavier seul : en mode relecture, sélectionnez le texte (navigation au curseur, <kbd>F7</kbd>), puis <kbd>Entrée</kbd>.
+- **Cache et optimisation** : après une mise à jour, videz le cache des pages. Si un outil retarde ou fusionne les scripts, excluez-en `coquille-revue`. Avec une politique de sécurité du contenu (CSP) stricte, seul le petit script de configuration écrit dans la page demande un jeton (filtre `wp_inline_script_attributes`) ; sans lui, le crayon ne s'affiche pas.
+- **API REST** (`coquille-revue/v1`) : `POST /annotation` pour envoyer ; `GET /annotations` (paginé : `per_page`, 100 au plus, et `page` ; totaux dans les en-têtes `X-WP-Total` et `X-WP-TotalPages`) et `PATCH /annotation/{id}/status`, pour les personnes qui gèrent les annotations.
+- **Désinstallation** : désactiver l'extension garde tout ; la supprimer depuis l'écran **Extensions** efface la table des annotations, les réglages et les tâches planifiées, sur tous les sites du réseau.
 
 ## Limites actuelles
 

@@ -68,7 +68,7 @@ If you use the optional Claude Code companion, Claude Code reads the text, the r
 
 == Installation ==
 
-1. In your WordPress admin, go to Plugins > Add New, search for "Coquille Revue", then install and activate it (on multisite: activate it per site or network-wide).
+1. In your WordPress admin, go to Plugins > Add New Plugin, search for "Coquille Revue", then install and activate it (on multisite: activate it per site or network-wide).
 2. Open the Coquille Revue page in the admin menu. The plugin starts in private mode: logged-in users who can edit posts already see the pencil button on your pages.
 3. To let any visitor annotate, switch to public mode on the same page. Behind a proxy or a CDN such as Cloudflare, define `COQUILLE_REVUE_TRUSTED_PROXY_HEADER` in `wp-config.php` so that anti-spam limits use the real visitor IP address.
 4. Still on that page, an administrator can turn the thank-you email off and the public credit on.

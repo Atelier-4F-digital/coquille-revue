@@ -28,7 +28,7 @@ All notable changes to Coquille Revue. Format based on [Keep a Changelog](https:
 
 - **Translation-ready interface**: every text shown to visitors and administrators, sent by email or returned by the REST API is an English source string of the `coquille-revue` text domain, loaded on `init` from the `languages/` folder (`Domain Path`). The folder ships the `coquille-revue.pot` template and a complete French translation (`.po`, `.mo` and `.l10n.php`). The script's texts are passed in `window.coquilleRevueConfig.i18n`.
 - `_meta.plugin_version` key in the JSON export, read by the Claude Code plugin.
-- 11 English prompt injection cases in `tests/injection/cases.json` (28 cases in all).
+- 13 new prompt injection cases in `tests/injection/cases.json` (30 cases in all): 11 in English, and 2 (French and English) with an instruction hidden in invisible Unicode “Tag” characters. `insert-cases.php` also publishes a page that holds the original texts and points the annotations to it; `delete-cases.php` deletes it.
 - Per-site “Thank-you email” setting (on by default) on the admin page, for the site's administrators only. When it is off, visitors are no longer asked for their email, the email is not stored, and the privacy texts are adapted. The `coquille_revue_notify_contributor` filter (`$enabled`, `$row`) decides annotation by annotation.
 - Admin page: 50 annotations per page with pagination, alerts under each suggestion (the same alerts as in the exports for Claude Code), full original text and suggestion on hover, confirmation before “Applied” when a thank-you email is about to be sent.
 - Per-site “Credit” setting (off by default), for the site's administrators only. Both site settings (thank-you email and credit) are saved by a single form.
@@ -75,7 +75,7 @@ All notable changes to Coquille Revue. Format based on [Keep a Changelog](https:
 
 ### Security
 
-- Thank-you email: at most 1 email per address per day, and 20 per day per site; a double click or two simultaneous calls on “Applied” send a single email. It ends with “If you did not make this suggestion, please ignore this message”.
+- Thank-you email: at most 1 email per address per day, and 20 per day per site; a double click or two simultaneous calls on “Applied” send a single email. It includes the sentence “If you did not make this suggestion, please ignore this message”.
 - CSV export: a cell that starts with `=`, `+`, `-`, `@`, a tab or a line break is prefixed with an apostrophe, so that a spreadsheet does not run it as a formula; quotes are doubled, with no escape character.
 - Markdown export: in the data block, every line of a value is indented by two spaces; a visitor can no longer write a fake `url:`, `author:` or `suggestion:` line. Translated titles are kept on a single line.
 - Alerts: `web_address` also matches `mailto:`, `tel:`, `data:`, `//host` and domains without `www` with common extensions (`.ru`, `.co`, `.io`…); `apply` refuses to add such links. The instruction or authority wording is searched in French and in English together, whatever the site language, and these word lists are never translated.

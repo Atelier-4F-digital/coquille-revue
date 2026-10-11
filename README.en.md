@@ -75,9 +75,10 @@ Annotations are text written by visitors, often anonymous: the plugin and the Cl
 - **Nothing is applied automatically.** Claude Code shows every change and waits for your approval, annotation by annotation. It never puts annotation text in a command line: the WP-CLI commands read it straight from the database.
 - **Automatic alerts**, computed without AI, on every annotation: web address, code (including shortcodes), invisible characters, mixed alphabets, instruction or authority phrasing in French and English. In the exports they are fixed codes (`web_address`, `code_or_command`, `invisible_characters`, `mixed_scripts`, `instruction_or_authority`, and `unreadable_text` for a text the checks cannot read).
 - **Instructions for Claude Code in fixed English**: they never go through translations, which therefore cannot weaken them.
-- **Spam protection** in public mode: honeypot field, limits per IP address (whole block for IPv6), per account and per site.
+- **Spam protection** in public mode: honeypot field; per IP address (whole /64 block for IPv6), at most 5 submissions in 5 minutes and 10 per hour; per account, 60 in 5 minutes; for the site, 30 anonymous submissions per hour.
+- **Thank-you email**: a generic message (site name, date, link to the home page), with none of the text typed by the visitor; at most 1 per address per day, and 20 per site per day.
 - **Multisite isolation** and **permissions**: a site only sees, exports and deletes its own annotations; contributors and authors have no access.
-- The rules were tested against prompt-injection attempts (booby-trapped annotations, see [tests/injection](tests/injection/)) before release.
+- The rules are tested with a prompt-injection kit (booby-trapped annotations, see [tests/injection](tests/injection/)), to be replayed before each release.
 
 Found a vulnerability? Please report it privately: see [SECURITY.md](SECURITY.md).
 
@@ -87,6 +88,13 @@ Found a vulnerability? Please report it privately: see [SECURITY.md](SECURITY.md
 - **Visible**: text, suggestion and name to editors and administrators; IP address to administrators (admin page, CSV export). The email is never displayed: it is only used for the thank-you message and WordPress privacy tools. Email and IP are **never** sent to Claude Code.
 - **Retention**: the IP address is erased after 30 days; a visitor's email and name within 24 hours after the annotation is handled (applied, rejected or archived), and after 6 months at the latest.
 - **WordPress tools**: a text is suggested for your privacy policy (**Settings > Privacy**), and personal data export and erasure requests (**Tools**) include annotations.
+
+## Good to know
+
+- **Keyboard shortcut**: <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>C</kbd> (<kbd>Option</kbd>+<kbd>Shift</kbd>+<kbd>C</kbd> on Mac) turns review mode on and off, for logged-in users. With the keyboard alone: in review mode, select the text (caret browsing, <kbd>F7</kbd>), then press <kbd>Enter</kbd>.
+- **Caching and optimization**: purge the page cache after an update. If a tool delays or combines scripts, exclude `coquille-revue`. With a strict Content Security Policy (CSP), only the small configuration script written in the page needs a nonce (`wp_inline_script_attributes` filter); without it, the pencil button is not shown.
+- **REST API** (`coquille-revue/v1`): `POST /annotation` to submit; `GET /annotations` (paginated: `per_page`, 100 at most, and `page`; totals in the `X-WP-Total` and `X-WP-TotalPages` headers) and `PATCH /annotation/{id}/status`, for the users who manage annotations.
+- **Uninstall**: deactivating the plugin keeps everything; deleting it from the **Plugins** screen removes the annotations table, the settings and the scheduled tasks, on every site of the network.
 
 ## Current limitations
 
