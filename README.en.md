@@ -4,6 +4,8 @@ An open-source WordPress plugin to proofread a website right on its pages: revie
 
 🇫🇷 [Version française](README.md)
 
+▶ [Try it in WordPress Playground](https://playground.wordpress.net/?blueprint-url=https://raw.githubusercontent.com/Atelier-4F-digital/coquille-revue/main/wporg-assets/blueprints/blueprint.json): a disposable WordPress in your browser, with the latest release of the plugin, public mode on and a sample page to review. Nothing is installed on your computer.
+
 ---
 
 ## What it does

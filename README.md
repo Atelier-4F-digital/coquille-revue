@@ -4,6 +4,8 @@ Extension WordPress open source pour relire un site directement sur ses pages : 
 
 🇬🇧 [English version](README.en.md)
 
+▶ [Essayer dans WordPress Playground](https://playground.wordpress.net/?blueprint-url=https://raw.githubusercontent.com/Atelier-4F-digital/coquille-revue/main/wporg-assets/blueprints/blueprint.json) (Try it in WordPress Playground) : un WordPress jetable dans votre navigateur, avec la dernière version de l'extension, le mode public activé et une page d'exemple à relire. Rien n'est installé chez vous ; l'interface de la démo est en anglais.
+
 ---
 
 ## Ce que fait l'extension

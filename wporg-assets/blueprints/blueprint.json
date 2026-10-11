@@ -1,0 +1,47 @@
+{
+  "$schema": "https://playground.wordpress.net/blueprint-schema.json",
+  "meta": {
+    "title": "Coquille Revue demo",
+    "description": "Installs the latest Coquille Revue release, turns on public mode and opens a sample page to review.",
+    "author": "Atelier-4F-digital",
+    "categories": ["Content"]
+  },
+  "landingPage": "/?pagename=coquille-revue-demo",
+  "preferredVersions": {
+    "php": "8.3",
+    "wp": "latest"
+  },
+  "login": true,
+  "steps": [
+    {
+      "step": "installPlugin",
+      "pluginData": {
+        "resource": "url",
+        "url": "https://github.com/Atelier-4F-digital/coquille-revue/releases/latest/download/coquille-revue.zip"
+      },
+      "options": {
+        "activate": true,
+        "targetFolderName": "coquille-revue"
+      }
+    },
+    {
+      "step": "setSiteOptions",
+      "options": {
+        "coquille_revue_require_login": "0"
+      }
+    },
+    {
+      "step": "wp-cli",
+      "command": [
+        "wp",
+        "post",
+        "create",
+        "--post_type=page",
+        "--post_status=publish",
+        "--post_name=coquille-revue-demo",
+        "--post_title=Coquille Revue demo",
+        "--post_content=This page has a few mistakes left on purpose. Find them and suggest a fix, the way a reviewer would.\n\n<h2>Our bakery</h2>\n\nWe bake fresh bread evry morning since 1998, with flour from a mill neer the village.\n\nThe shop is open from tuesday to Sunday, 7 am to 7 pm. Its closed on public holidays.\n\n<h2>How to review this page</h2>\n\n1. Click the pencil button to turn on review mode.\n2. Select a word or a sentence (or click and drag over an area), choose correction, suggestion or question, type your remark and press Enter.\n3. Open Coquille Revue in the admin menu: the annotation is there, with its status, the CSV, JSON and Markdown exports for Claude Code, and the settings.\n\nPublic mode is on in this demo, so visitors who are not logged in can annotate too."
+      ]
+    }
+  ]
+}
