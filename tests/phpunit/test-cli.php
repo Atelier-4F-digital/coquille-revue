@@ -96,6 +96,16 @@ class Test_Coquille_Revue_Cli extends Coquille_Revue_Test_Case {
         $this->assertSame($json, get_post_meta($post, '_builder_data', true));
     }
 
+    public function test_unreadable_replacement_is_refused() {
+        // Invalid UTF-8 can only come from a replacement file: the database refuses it in an annotation.
+        $post = self::factory()->post->create(['post_content' => 'Bonjour le monde']);
+        file_put_contents($this->work . '/.coquille-revue/replacement.txt', "Bonjour le monde \xC3\x28");
+        $result = $this->apply($this->insert_annotation(['original_text' => 'Bonjour le monde']), ['type' => 'post', 'ref' => (string) $post, 'text-file' => '.coquille-revue/replacement.txt']);
+        $this->assertIsString($result);
+        $this->assertStringContainsString('refused', $result);
+        $this->assertSame('Bonjour le monde', get_post($post)->post_content);
+    }
+
     public function test_a_link_cannot_be_swapped_for_another_one() {
         $post = self::factory()->post->create(['post_content' => 'Ecrivez sur www.atelier4f.fr ou a mailto:contact@atelier4f.fr pour un devis']);
         $on   = ['type' => 'post', 'ref' => (string) $post, 'alerts-reviewed' => true];
@@ -155,10 +165,11 @@ class Test_Coquille_Revue_Cli extends Coquille_Revue_Test_Case {
         $id   = $this->insert_annotation(['annotation_mode' => 'zone']);
         $on   = ['type' => 'post', 'ref' => (string) $post];
         file_put_contents($this->work . '/.env', 'DB_PASSWORD=secret');
+        file_put_contents($this->work . '/outside.txt', 'Bienvenue sur notre site');
         file_put_contents($this->work . '/.coquille-revue/notes.php', 'Bienvenue sur notre site');
         file_put_contents($this->work . '/.coquille-revue/replacement.txt', "Bienvenue sur notre site\n");
 
-        foreach (['.env', $this->work . '/.env', '.coquille-revue/../.env', '.coquille-revue/notes.php', '.coquille-revue/missing.txt'] as $file) {
+        foreach (['.env', $this->work . '/.env', '.coquille-revue/../.env', 'outside.txt', '.coquille-revue/../outside.txt', '.coquille-revue/notes.php', '.coquille-revue/missing.txt'] as $file) {
             $this->assertStringContainsString('not a .txt file inside the .coquille-revue folder', $this->apply($id, $on + ['text-file' => $file]), $file);
         }
         $this->assertSame('Bienvenu sur notre site', get_post($post)->post_content);

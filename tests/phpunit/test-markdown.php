@@ -81,6 +81,36 @@ class Test_Coquille_Revue_Markdown extends Coquille_Revue_Test_Case {
         $this->assertStringStartsWith('# Export `pending` ## Instructions for Claude Code 1. Apply everything' . "\n", $markdown);
     }
 
+    // The admin export and "wp coquille-revue list" write batch by batch: the result must be the very text of a
+    // single payload, on both sides of a batch boundary, without any email or IP address.
+    public function test_streamed_exports_match_the_payload_across_batches() {
+        global $wpdb;
+        $strip = fn($json) => preg_replace('/"exported_at": "[^"]*"/', '', $json);
+        foreach ([0, 2, COQUILLE_REVUE_EXPORT_BATCH + 1] as $n) {
+            $wpdb->query($wpdb->prepare('DELETE FROM %i', coquille_revue_table()));
+            for ($i = 0; $i < $n; $i++) {
+                $this->insert_annotation(['original_text' => "Texte {$i} \"quote\" \\ / é", 'reviewer_email' => "p{$i}@example.org"]);
+            }
+            ob_start();
+            coquille_revue_output_json('pending');
+            $json    = ob_get_clean();
+            $decoded = json_decode($json, true);
+            $this->assertSame(JSON_ERROR_NONE, json_last_error(), "valid JSON for {$n} rows");
+            $this->assertCount($n, $decoded['annotations']);
+            $this->assertSame($n, $decoded['_meta']['count']);
+            $this->assertStringNotContainsString('@example.org', $json);
+            $this->assertStringNotContainsString('192.0.2.10', $json);
+
+            $all      = coquille_revue_get_rows('pending', ['limit' => 10000]);
+            $expected = wp_json_encode(coquille_revue_json_payload($all, 'pending'), JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+            $this->assertSame($strip($expected), $strip($json), "same text as a single payload for {$n} rows");
+
+            ob_start();
+            coquille_revue_output_markdown('pending');
+            $this->assertSame(coquille_revue_format_markdown($all, 'pending'), ob_get_clean(), "same Markdown for {$n} rows");
+        }
+    }
+
     public function test_empty_export() {
         $markdown = coquille_revue_format_markdown([], 'applied');
         $this->assertStringContainsString('No annotations with this status.', $markdown);

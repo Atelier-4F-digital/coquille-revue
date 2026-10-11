@@ -17,4 +17,10 @@
 			<directory prefix="test-" suffix=".php">./tests/phpunit/</directory>
 		</testsuite>
 	</testsuites>
+	<!-- Tests that change the whole process (constant, real DROP TABLE) run in a pass of their own: group "isolated". -->
+	<groups>
+		<exclude>
+			<group>isolated</group>
+		</exclude>
+	</groups>
 </phpunit>

@@ -151,6 +151,8 @@ class Test_Coquille_Revue_Alerts extends Coquille_Revue_Test_Case {
             $this->assertContains('code_or_command', $this->alerts($text), $text);
         }
         $this->assertContains('web_address', $this->alerts("Rendez-vous sur \u{FF45}\u{FF56}\u{FF49}\u{FF4C}\u{FF0E}\u{FF52}\u{FF55}"));
+        // Full-width tag: only the decoded copy shows it is code.
+        $this->assertContains('code_or_command', $this->alerts("\u{FF1C}\u{FF49}\u{FF46}\u{FF52}\u{FF41}\u{FF4D}\u{FF45}\u{FF1E}"));
         $this->assertSame([], $this->alerts('Remise de 50 % sur le 2e article'));
     }
 
@@ -162,10 +164,13 @@ class Test_Coquille_Revue_Alerts extends Coquille_Revue_Test_Case {
     }
 
     public function test_link_detection_takes_linear_time() {
-        $fill   = fn($length) => substr(str_repeat('a.', $length), 0, $length);
-        $start  = microtime(true);
+        $fill  = fn($length) => substr(str_repeat('a.', $length), 0, $length);
+        // Unbounded repetitions took about 1 s on 8,000 characters with PCRE JIT (8 s without), and failed on longer
+        // texts; bounded ones take a few milliseconds.
+        $start = microtime(true);
+        $this->assertSame(0, preg_match(COQUILLE_REVUE_LINK_PATTERN, $fill(8000)));
+        $this->assertLessThan(0.2, microtime(true) - $start);
         $alerts = coquille_revue_annotation_alerts(['author_name' => $fill(100), 'page_title' => $fill(255), 'original_text' => $fill(2000), 'suggestion' => $fill(2000)]);
-        $this->assertLessThan(1.0, microtime(true) - $start);
         $this->assertNotContains('web_address', $alerts);
         $this->assertContains('web_address', $this->alerts('Voir a.b.c.d.e.f.g.h.i.j.k.evil.ru'));
     }

@@ -30,7 +30,9 @@ Les règles sont dans `phpcs.xml.dist` (étape 1) : sécurité, base de données
 
 ### Tests PHPUnit
 
-Les tests d'intégration de `tests/phpunit/` tournent dans la suite de tests de WordPress : API REST (droits, champ piège, limites d'envoi, validation des champs, statuts), données personnelles (export, effacement, purge), CSV, e-mail de remerciement, alertes en français et en anglais, export Markdown, et cloisonnement des sites en multisite.
+Les tests d'intégration de `tests/phpunit/` tournent dans la suite de tests de WordPress : API REST (droits, champ piège, limites d'envoi, validation des champs, statuts), données personnelles (export, effacement, purge, dates), CSV, e-mail de remerciement, alertes en français et en anglais, exports Markdown et JSON, commandes WP-CLI (chaque refus de `apply`, grâce à une doublure de WP-CLI déclarée dans `tests/phpunit/bootstrap.php`), actions et rendu de la page d'admin, chargement des fichiers, migration de la base, et cloisonnement des sites en multisite.
+
+Le groupe `isolated` (`tests/phpunit/test-isolated.php` : en-tête du proxy de confiance, désinstallation) modifie tout le processus (constante définie, vrai `DROP TABLE` qui valide la transaction en cours) : il est exclu du passage principal et se lance à part, avec `vendor/bin/phpunit --group isolated`.
 
 > ⚠️ La suite de tests efface et recrée les tables WordPress de sa base à chaque lancement : utilisez une base **dédiée**, jamais celle d'un site.
 
@@ -39,8 +41,8 @@ Sous Linux ou macOS, avec MySQL ou MariaDB démarré :
 ```bash
 mysqladmin -u root -p create wordpress_tests
 WP_INSTALL_TESTS_SKIP_UPDATE_CHECK=true bash bin/install-wp-tests.sh wordpress_tests root '<mot de passe>' 127.0.0.1 latest true
-vendor/bin/phpunit
-WP_MULTISITE=1 vendor/bin/phpunit
+vendor/bin/phpunit && vendor/bin/phpunit --group isolated
+WP_MULTISITE=1 vendor/bin/phpunit && WP_MULTISITE=1 vendor/bin/phpunit --group isolated
 ```
 
 `bin/install-wp-tests.sh` (copie épinglée du modèle de WP-CLI, sans svn) télécharge WordPress et sa suite de tests dans le dossier temporaire (variables `WP_CORE_DIR` et `WP_TESTS_DIR`). Le dernier argument `true` saute la création de la base ; `latest` peut être remplacé par une version (`6.2`, `7.1.3`) ou par `trunk`.
@@ -53,7 +55,7 @@ WP_MULTISITE=1 bash bin/test-local.sh
 bash bin/test-local.sh --filter Alerts
 ```
 
-`bin/test-local.sh` utilise le PHP et le MySQL de Local : démarrez d'abord un site dans Local. Il crée la base dédiée `coquille_revue_tests`, télécharge WordPress (7.1.3 par défaut) et sa suite de tests dans `~/wp-tests`, puis lance PHPUnit avec les options passées. Réglages par variables : `DB_PORT` (port MySQL du site, à lire dans `%APPDATA%/Local/sites.json` ; 10022 par défaut), `WP_VERSION`, `WP_TESTS_BASE`, `LOCAL_PHP_DIR`, `LOCAL_MYSQL`, et `COMPOSER_PHAR` (seulement si `vendor/` manque).
+`bin/test-local.sh` utilise le PHP et le MySQL de Local : démarrez d'abord un site dans Local. Il crée la base dédiée `coquille_revue_tests`, télécharge WordPress (7.1.3 par défaut) et sa suite de tests dans `~/wp-tests`, puis lance PHPUnit : le passage principal puis le groupe `isolated`, ou un seul passage avec les options données. Le chemin `WP_TESTS_BASE` ne doit pas contenir d'espace (`bin/install-wp-tests.sh` ne protège pas ses chemins : le script refuse de démarrer). Réglages par variables : `DB_PORT` (port MySQL du site, à lire dans `%APPDATA%/Local/sites.json` ; 10022 par défaut), `WP_VERSION`, `WP_TESTS_BASE`, `LOCAL_PHP_DIR`, `LOCAL_MYSQL`, et `COMPOSER_PHAR` (seulement si `vendor/` manque).
 
 ### Essayer dans WordPress Playground
 
@@ -70,7 +72,7 @@ bash bin/test-local.sh --filter Alerts
 
 ### Intégration continue
 
-`.github/workflows/ci.yml` (GitHub Actions) tourne à chaque envoi sur `main` et à chaque Pull Request : syntaxe PHP de 7.4 à 8.4, PHPCS, validité des fichiers JSON, PHPUnit avec MySQL 8.4 (PHP 7.4 et WordPress 6.2, PHP 8.3 et WordPress 7.1, et WordPress 7.1 en multisite), et Plugin Check sur le contenu réel du zip (seules les erreurs bloquent). Les actions sont épinglées par SHA de commit, version en commentaire : pour en mettre une à jour, changez le SHA et le commentaire ensemble.
+`.github/workflows/ci.yml` (GitHub Actions) tourne à chaque envoi sur `main` et à chaque Pull Request : syntaxe PHP de 7.4 à 8.4, PHPCS, validité des fichiers JSON, syntaxe JavaScript (`node --check`) et shell (`bash -n`), PHPUnit (passage principal et groupe `isolated`) avec MySQL 8.4 (PHP 7.4 et WordPress 6.2, PHP 8.3 et WordPress 7.1, et WordPress 7.1 en multisite), et Plugin Check sur le contenu réel du zip (seules les erreurs bloquent). Les actions sont épinglées par SHA de commit, version en commentaire : pour en mettre une à jour, changez le SHA et le commentaire ensemble.
 
 Sur un tag `vX.Y.Z`, une fois tout au vert, le job `release` vérifie que le tag, l'en-tête `Version` et la constante `COQUILLE_REVUE_VERSION` sont identiques, puis crée une release **en brouillon** avec `coquille-revue-X.Y.Z.zip`, `coquille-revue.zip` (nom fixe, utilisé par le lien Playground) et la section du CHANGELOG. La publication reste manuelle ; une release qui existe déjà n'est jamais modifiée.
 

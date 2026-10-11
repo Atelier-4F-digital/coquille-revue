@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # PHPUnit tests on Windows (Git Bash) with the PHP and MySQL of Local, without Docker.
 # Requires a Local site started (its MySQL listens on DB_PORT) and composer.phar (COMPOSER_PHAR).
-#   bash bin/test-local.sh                      single site
+#   bash bin/test-local.sh                      single site (main pass, then the isolated group)
 #   WP_MULTISITE=1 bash bin/test-local.sh       multisite
-#   bash bin/test-local.sh --filter Alerts      any PHPUnit option
+#   bash bin/test-local.sh --filter Alerts      any PHPUnit option (one pass with these options)
 # The tests use their own database, coquille_revue_tests, never the database of a site: the WordPress
 # test suite drops and recreates the WordPress tables of its database at each run.
 set -euo pipefail
@@ -20,13 +20,19 @@ WP_VERSION="${WP_VERSION:-7.1.3}"
 BASE="${WP_TESTS_BASE:-$HOME/wp-tests}"
 COMPOSER_PHAR="${COMPOSER_PHAR:-$HOME/bin/composer.phar}"
 
+# bin/install-wp-tests.sh (copied from WP-CLI, unchanged) does not quote its paths: with a space in them,
+# "rm -rf" would target other folders (C:/Users/Jean for C:/Users/Jean Dupont/wp-tests).
+case "$BASE" in
+  *[[:space:]]*) echo "WP_TESTS_BASE must not contain spaces (bin/install-wp-tests.sh does not quote its paths): $BASE" >&2; exit 1 ;;
+esac
+
 for f in "$LOCAL_PHP_DIR/php.exe" "$LOCAL_MYSQL"; do
   [ -f "$f" ] || { echo "Not found: $f (set LOCAL_PHP_DIR or LOCAL_MYSQL)." >&2; exit 1; }
 done
 
 mkdir -p "$BASE/php" "$BASE/tmp"
-if [ ! -f "$BASE/php/php.ini" ]; then
-  cat > "$BASE/php/php.ini" <<EOF
+# Written at every run: another LOCAL_PHP_DIR (another PHP version of Local) must not keep the old extension_dir.
+cat > "$BASE/php/php.ini" <<EOF
 extension_dir="$(cygpath -m "$LOCAL_PHP_DIR/ext")"
 extension=mysqli
 extension=mbstring
@@ -41,7 +47,6 @@ memory_limit=1024M
 display_startup_errors=0
 error_reporting=E_ALL
 EOF
-fi
 
 # The WordPress installer runs "php" in a sub-process: it must be in the PATH and read the same php.ini (mysqli).
 export PATH="$LOCAL_PHP_DIR:$PATH"
@@ -74,4 +79,10 @@ grep -q "define( 'DB_NAME', '$DB_NAME' );" "$config" || { echo "$config does not
 # Local may give the site another port: keep the configuration in step.
 sed -i "s|define( 'DB_HOST', '[^']*' );|define( 'DB_HOST', '127.0.0.1:$DB_PORT' );|" "$config"
 
-php vendor/bin/phpunit "$@"
+if [ "$#" -gt 0 ]; then
+  php vendor/bin/phpunit "$@"
+else
+  php vendor/bin/phpunit
+  # Tests that change the whole process (trusted proxy constant, real DROP TABLE of uninstall.php).
+  php vendor/bin/phpunit --group isolated
+fi

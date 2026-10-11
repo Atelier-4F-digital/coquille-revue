@@ -59,6 +59,10 @@ jobs:
         run: vendor/bin/phpcs
       - name: JSON files are valid (blueprint, Claude Code plugin, Composer, injection cases)
         run: git ls-files -z -- '*.json' | xargs -0 -n 1 jq empty
+      - name: JavaScript and shell syntax (Plugin Check does not parse JavaScript)
+        run: |
+          git ls-files -z -- '*.js' | xargs -0 -n 1 node --check
+          git ls-files -z -- '*.sh' | xargs -0 -n 1 bash -n
 
   phpunit:
     name: PHPUnit PHP ${{ matrix.php }}, WordPress ${{ matrix.wp }}${{ matrix.multisite == '1' && ', multisite' || '' }}
@@ -105,6 +109,8 @@ jobs:
         run: bash bin/install-wp-tests.sh wordpress_tests root root 127.0.0.1:3306 ${{ matrix.wp }} true
       - name: PHPUnit
         run: vendor/bin/phpunit
+      - name: PHPUnit, isolated group (trusted proxy constant, real DROP TABLE of uninstall.php)
+        run: vendor/bin/phpunit --group isolated
 
   plugin-check:
     name: Plugin Check (contents of the zip)

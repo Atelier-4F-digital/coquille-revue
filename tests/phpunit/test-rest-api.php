@@ -177,6 +177,26 @@ class Test_Coquille_Revue_Rest_Api extends Coquille_Revue_Test_Case {
         $this->assertSame(201, $this->post_annotation()->get_status());
     }
 
+    public function test_logged_in_user_limit() {
+        $user = self::factory()->user->create(['role' => 'editor']);
+        wp_set_current_user($user);
+        set_transient('coquille_revue_rl_u' . $user, ['n' => COQUILLE_REVUE_RATE_LIMIT_PER_USER, 'start' => time()], COQUILLE_REVUE_RATE_LIMIT_WINDOW);
+        $this->assertSame(429, $this->post_annotation()->get_status());
+    }
+
+    public function test_admin_digest_counts_each_annotation_once() {
+        $this->set_public_mode();
+        $this->assertSame(201, $this->post_annotation()->get_status());
+        $this->assertNotFalse(wp_next_scheduled('coquille_revue_send_digest'));
+        $this->assertSame(201, $this->post_annotation(['originalText' => 'Un autre texte'])->get_status());
+
+        do_action('coquille_revue_send_digest');
+        $this->assertCount(1, $this->sent_mails());
+        $this->assertStringContainsString('2 new annotations', $this->sent_mails()[0]['subject']);
+        do_action('coquille_revue_send_digest');
+        $this->assertCount(1, $this->sent_mails(), 'nothing new: no second email');
+    }
+
     public function test_listing_and_status_change_are_for_editors() {
         $id = $this->insert_annotation();
         $this->assertSame(401, $this->rest('GET', '/annotations')->get_status());
