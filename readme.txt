@@ -93,7 +93,7 @@ Yes. Pages served to visitors who are not logged in contain no security token, s
 
 = Does it work with a strict Content Security Policy? =
 
-Yes. Styles and scripts are files loaded by WordPress; only the small inline configuration script needs a nonce (`wp_inline_script_attributes` filter).
+Yes. On public pages, styles and scripts are files loaded by WordPress; only the small inline configuration script needs a nonce (`wp_inline_script_attributes` filter). Without that nonce, the pencil button is simply not shown. The admin page adds one small inline script (the confirmation before "Applied"), covered by the same filter.
 
 = Can I use a keyboard? =
 
@@ -131,7 +131,7 @@ Other changes:
 * Translation-ready, with a complete French translation. The thank-you and digest emails are sent in the site language.
 * Per-site settings for the thank-you email (on by default) and the public credit (off by default).
 * Admin page: pagination, alerts under each suggestion, confirmation before a status change that sends a thank-you email.
-* Styles and scripts are files loaded by WordPress, only where review mode is available.
+* Public styles and scripts are files loaded by WordPress, only where review mode is available.
 * Accessible review interface and full touch-screen support.
 * Security: hourly limit per IP address, safer exports, wider detection of links and instructions (French and English).
 * Uninstalling removes the plugin data.

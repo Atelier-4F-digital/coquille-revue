@@ -152,10 +152,13 @@
     if (focusField) setTimeout(() => textarea.focus({ preventScroll: true }), 60);
   }
 
-  // Message annoncé par la zone role="status" ; le texte est vidé une fois le message masqué.
+  // Message annoncé par la zone live (role="status", ou "alert" pour une erreur, lue sans attendre) ;
+  // le texte est vidé une fois le message masqué.
   let toastTimer = null;
   function showToast(msg, type) {
     clearTimeout(toastTimer);
+    toast.setAttribute('role', type === 'error' ? 'alert' : 'status');
+    toast.setAttribute('aria-live', type === 'error' ? 'assertive' : 'polite');
     toast.textContent = msg;
     toast.className = 'coquille-show coquille-' + type;
     toastTimer = setTimeout(() => {
@@ -176,8 +179,19 @@
     restoringFocus = false;
   }
 
+  // Surlignage propre à l'extension (CSS Custom Highlight API) : le passage choisi reste repéré dans la page quand
+  // le champ prend le focus, ce qui efface la sélection du navigateur. Sans cette API, la bulle cite le passage.
+  const canHighlight = !!(window.CSS && CSS.highlights && window.Highlight);
+  function highlightSelection(range) {
+    if (canHighlight) CSS.highlights.set('coquille-selection', new Highlight(range.cloneRange()));
+  }
+  function clearHighlight() {
+    if (canHighlight) CSS.highlights.delete('coquille-selection');
+  }
+
   function closeBubble() {
     const hadFocus = focusIsIn(bubble);
+    clearHighlight();
     bubble.classList.remove('coquille-visible');
     zoneHL.classList.remove('coquille-visible');
     currentAnnotation = null;
@@ -273,6 +287,7 @@
     origText.textContent = fmt(t.quoted, preview);
     if (!updating) textarea.value = '';
 
+    highlightSelection(range);
     showBubble(range.getBoundingClientRect(), !touch);
     return true;
   }
@@ -288,6 +303,7 @@
     zoneHL.style.width = w + 'px';
     zoneHL.style.height = h + 'px';
     zoneHL.classList.add('coquille-visible');
+    clearHighlight();
 
     const elText = (elBehind.innerText || '').trim().slice(0, 120);
 
@@ -463,8 +479,11 @@
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        const messages = { 413: t.errorTooLong, 429: t.errorRateLimited, 401: t.errorLoginRequired, 403: t.errorForbidden };
-        throw new Error(messages[res.status] || err.message || fmt(t.errorGeneric, res.status));
+        // Champ trop long : 400 rest_invalid_param, avec le code rest_too_long dans le détail du champ.
+        const tooLong = res.status === 400 && err.code === 'rest_invalid_param'
+          && Object.values((err.data && err.data.details) || {}).some(d => d && d.code === 'rest_too_long');
+        const messages = { 429: t.errorRateLimited, 401: t.errorLoginRequired, 403: t.errorForbidden };
+        throw new Error((tooLong && t.errorTooLong) || messages[res.status] || err.message || fmt(t.errorGeneric, res.status));
       }
       showToast(t.sent, 'success');
       exitReviewMode(); // sortie automatique du mode après envoi réussi
@@ -523,4 +542,7 @@
     }
   }
 
+  // Tout est prêt : le crayon peut s'afficher. Si le script ne tourne pas (CSP stricte sans jeton, script retardé
+  // ou cassé par un outil d'optimisation), aucun bouton inerte n'est montré.
+  document.getElementById('coquille-revue-root').classList.add('coquille-ready');
 })();

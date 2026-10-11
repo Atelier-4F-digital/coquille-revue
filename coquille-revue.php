@@ -361,7 +361,10 @@ function coquille_revue_render_overlay() {
     <div id="coquille-zone-rect" aria-hidden="true"></div>
     <div id="coquille-zone-highlight" aria-hidden="true"></div>
 
-    <!-- Icône flottante toujours visible (crayon) : bouton à bascule du mode relecture -->
+    <?php
+    // Crayon : bouton à bascule du mode relecture (aria-pressed), affiché seulement une fois le script prêt (classe
+    // coquille-ready). Pas d'aria-expanded : la fenêtre d'information est sa description, pas un menu qu'il ouvre.
+    ?>
     <button type="button" id="coquille-fab" aria-label="<?php esc_attr_e('Review mode', 'coquille-revue'); ?>" aria-pressed="false" aria-describedby="coquille-info-text"<?php echo $is_logged ? ' aria-keyshortcuts="Alt+Shift+C"' : ''; ?>>
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
         <path d="M12 20h9"/>
@@ -369,9 +372,9 @@ function coquille_revue_render_overlay() {
       </svg>
     </button>
 
-    <!-- Fenêtre d'information : au survol ou au focus du crayon -->
-    <div id="coquille-info-popover">
-      <p class="coquille-info-title"><svg class="coquille-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg> <?php esc_html_e('Help us improve this page', 'coquille-revue'); ?></p>
+    <?php // Fenêtre d'information : au survol ou au focus du crayon ?>
+    <div id="coquille-info-popover" role="region" aria-labelledby="coquille-info-title">
+      <p class="coquille-info-title" id="coquille-info-title"><svg class="coquille-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg> <?php esc_html_e('Help us improve this page', 'coquille-revue'); ?></p>
       <p id="coquille-info-text"><?php esc_html_e('Spotted a typo, some wording to rephrase or an area to improve? Turn on review mode to leave us a suggestion right on the page.', 'coquille-revue'); ?></p>
       <?php if ($is_logged): ?>
       <p><?php
@@ -398,7 +401,7 @@ function coquille_revue_render_overlay() {
       <?php endif; ?>
     </div>
 
-    <!-- Barre de contrôles (visible quand mode actif) -->
+    <?php // Barre de contrôles (visible quand le mode relecture est actif) ?>
     <div id="coquille-bar" role="region" aria-label="<?php esc_attr_e('Review toolbar', 'coquille-revue'); ?>">
       <span class="coquille-dot" aria-hidden="true"></span>
       <span id="coquille-label">
@@ -427,7 +430,7 @@ function coquille_revue_render_overlay() {
       <button type="button" id="coquille-stop-btn"><svg class="coquille-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="6" y="6" width="12" height="12" rx="2"/></svg> <?php echo esc_html_x('Stop', 'leave review mode', 'coquille-revue'); ?></button>
     </div>
 
-    <!-- Bulle d'annotation -->
+    <?php // Bulle d'annotation ?>
     <div id="coquille-bubble" role="dialog" aria-labelledby="coquille-bubble-title" aria-describedby="coquille-original-text">
       <div id="coquille-bubble-header">
         <span id="coquille-bubble-title"><?php esc_html_e('Selected text', 'coquille-revue'); ?></span>

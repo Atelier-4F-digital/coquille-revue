@@ -76,6 +76,10 @@
     box-shadow 0.15s,
     background 0.15s;
 }
+/* Crayon affiché seulement une fois le script prêt (classe ajoutée par overlay.js) : sans script, pas de bouton inerte. */
+#coquille-revue-root:not(.coquille-ready) #coquille-fab {
+  display: none;
+}
 #coquille-fab:hover {
   transform: translateY(-2px);
   box-shadow: 0 14px 36px rgba(0, 0, 0, 0.45);
@@ -596,6 +600,12 @@ body.coquille-mode-active #coquille-revue-root textarea {
 }
 #coquille-zone-highlight.coquille-visible {
   display: block;
+}
+
+/* Passage choisi, toujours repéré dans la page quand la bulle est ouverte (CSS Custom Highlight API) */
+::highlight(coquille-selection) {
+  background-color: #facc15;
+  color: #111;
 }
 
 /* En mode relecture, le crayon et les messages passent au-dessus de la barre (sinon ils cachent « Arrêter »). */
