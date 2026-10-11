@@ -103,7 +103,10 @@ class Test_Coquille_Revue_Cli extends Coquille_Revue_Test_Case {
         // Invalid UTF-8 can only come from a replacement file: the database refuses it in an annotation.
         $post = self::factory()->post->create(['post_content' => 'Bonjour le monde']);
         file_put_contents($this->work . '/.coquille-revue/replacement.txt', "Bonjour le monde \xC3\x28");
-        $result = $this->apply($this->insert_annotation(['original_text' => 'Bonjour le monde']), ['type' => 'post', 'ref' => (string) $post, 'text-file' => '.coquille-revue/replacement.txt']);
+        $id = $this->insert_annotation(['original_text' => 'Bonjour le monde']);
+        $on = ['type' => 'post', 'ref' => (string) $post, 'text-file' => '.coquille-revue/replacement.txt'];
+        $this->assertStringContainsString('Annotation with alerts: unreadable_text', $this->apply($id, $on));
+        $result = $this->apply($id, $on + ['alerts-reviewed' => true]);
         $this->assertIsString($result);
         $this->assertStringContainsString('cannot be read by the checks', $result);
         $this->assertSame('Bonjour le monde', get_post($post)->post_content);
@@ -120,6 +123,51 @@ class Test_Coquille_Revue_Cli extends Coquille_Revue_Test_Case {
         } catch (Coquille_Revue_Test_CLI_Error $e) {
             $this->assertStringContainsString('cannot be read by the checks', $e->getMessage());
         }
+    }
+
+    public function test_structure_characters_that_are_not_in_the_original_text() {
+        $post = self::factory()->post->create(['post_content' => 'Recherche et développement']);
+        $on   = ['type' => 'post', 'ref' => (string) $post];
+        // \ < > & { } ` : refused even after review of the alerts.
+        foreach (['Recherche & développement' => '&', 'Recherche {et} développement' => '{ }', 'Recherche et développement \\' => '\\', 'Recherche et < développement' => '<'] as $suggestion => $symbols) {
+            $result = $this->apply($this->insert_annotation(['original_text' => 'Recherche et développement', 'suggestion' => $suggestion]), $on + ['alerts-reviewed' => true]);
+            $this->assertStringContainsString("adds characters that are not in the original text ({$symbols})", $result, $suggestion);
+        }
+        $this->assertSame('Recherche et développement', get_post($post)->post_content);
+
+        // " % = : only after review of the alerts.
+        $id = $this->insert_annotation(['original_text' => 'Recherche et développement', 'suggestion' => 'Recherche et développement" x="']);
+        $this->assertStringContainsString('Annotation with alerts: added_symbols (U+0022, U+003D)', $this->apply($id, $on));
+        $this->assertIsArray($this->apply($id, $on + ['alerts-reviewed' => true]));
+
+        // An approved text goes through the same alerts as a suggestion.
+        $post = self::factory()->post->create(['post_content' => 'Bienvenu sur notre site']);
+        file_put_contents($this->work . '/.coquille-revue/replacement.txt', 'Bienvenue sur notre site, "le meilleur"');
+        $result = $this->apply($this->insert_annotation(), ['type' => 'post', 'ref' => (string) $post, 'text-file' => '.coquille-revue/replacement.txt']);
+        $this->assertStringContainsString('Annotation with alerts: added_symbols (U+0022)', $result);
+        $this->assertSame('Bienvenu sur notre site', get_post($post)->post_content);
+    }
+
+    public function test_hidden_characters_are_refused_even_after_review() {
+        $post = self::factory()->post->create(['post_content' => 'Bienvenu sur notre site']);
+        $on   = ['type' => 'post', 'ref' => (string) $post, 'text-file' => '.coquille-revue/replacement.txt', 'alerts-reviewed' => true];
+        $id   = $this->insert_annotation();
+        foreach ([
+            "Bienvenue sur notre site\u{E0041}\u{E0049}",
+            "Bienvenue sur notre\u{061C} site",
+            "Bienvenue sur notre site\u{202E}",
+            'Bienvenue sur notre site&#xE0041;',
+        ] as $replacement) {
+            file_put_contents($this->work . '/.coquille-revue/replacement.txt', $replacement);
+            $this->assertStringContainsString('contains hidden characters', $this->apply($id, $on), $replacement);
+        }
+        $this->assertSame('Bienvenu sur notre site', get_post($post)->post_content);
+
+        // The Tag characters of a valid emoji flag are allowed.
+        $england = "\u{1F3F4}\u{E0067}\u{E0062}\u{E0065}\u{E006E}\u{E0067}\u{E007F}";
+        file_put_contents($this->work . '/.coquille-revue/replacement.txt', "Bienvenue sur notre site {$england}");
+        $this->assertIsArray($this->apply($id, $on));
+        $this->assertSame("Bienvenue sur notre site {$england}", get_post($post)->post_content);
     }
 
     public function test_punctuation_right_after_an_address_can_be_corrected() {

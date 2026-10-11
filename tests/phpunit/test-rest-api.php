@@ -111,6 +111,24 @@ class Test_Coquille_Revue_Rest_Api extends Coquille_Revue_Test_Case {
         }
     }
 
+    public function test_tag_characters_and_arabic_letter_mark_are_refused_but_not_a_flag() {
+        $this->set_public_mode();
+        foreach ([
+            'suggestion'   => "Bienvenue\u{E0049}\u{E0047}\u{E004E}",
+            'originalText' => "Bienvenu\u{061C} sur notre site",
+            'pageTitle'    => "Home\u{E007F}",
+            'reviewerName' => "Marie\u{E0020}",
+        ] as $field => $value) {
+            $response = $this->post_annotation([$field => $value]);
+            $this->assertSame(400, $response->get_status(), $field);
+            $this->assertSame('invalid_chars', $response->get_data()['code'], $field);
+        }
+        $this->assertNull($this->last_annotation());
+
+        $england = "\u{1F3F4}\u{E0067}\u{E0062}\u{E0065}\u{E006E}\u{E0067}\u{E007F}";
+        $this->assertSame(201, $this->post_annotation(['suggestion' => "Bienvenue {$england}"])->get_status());
+    }
+
     public function test_visitor_limit_per_ip_in_five_minutes() {
         $this->set_public_mode();
         for ($i = 0; $i < COQUILLE_REVUE_RATE_LIMIT_PER_IP; $i++) {

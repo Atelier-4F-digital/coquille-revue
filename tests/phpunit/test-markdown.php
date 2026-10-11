@@ -42,7 +42,7 @@ class Test_Coquille_Revue_Markdown extends Coquille_Revue_Test_Case {
         $markdown = coquille_revue_format_markdown([$this->get_annotation($id)], 'pending');
 
         $this->assertStringContainsString("### #{$id} — correction — `text` — `anonymous_unverified`\n", $markdown);
-        $this->assertStringContainsString("**Alerts:** web_address, instruction_or_authority\n", $markdown);
+        $this->assertStringContainsString("**Alerts:** web_address, instruction_or_authority, long_addition\n", $markdown);
         $this->assertStringNotContainsString('**Alerts:**', $this->export([]));
     }
 

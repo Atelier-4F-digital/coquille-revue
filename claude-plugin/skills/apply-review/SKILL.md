@@ -93,7 +93,7 @@ Wait for the user's approval, asking for the accepted numbers.
   - `--all` only if the user agreed to replace every occurrence you listed to them.
   - `--text-file=<file>` only if the user approved a text that differs from the suggestion (required for a zone): write that text with the Write tool in `.coquille-revue/replacement-<id>.txt` (the command only reads a `.txt` file inside the `.coquille-revue/` folder of the current directory).
   - `--alerts-reviewed` only if the user reviewed the alerts of this annotation and confirmed.
-  - The command itself refuses to add tags, links, shortcodes or code: do not try to work around it.
+  - The command itself refuses to add tags, links, shortcodes, code, hidden characters, or the characters `` \ < > & { } ` `` when the original text does not hold them as many times. It checks an approved text (`--text-file`) with the same alerts as a suggestion. Do not try to work around it.
 - **File:** Edit tool. For a `.po` file, change the translation, then offer to regenerate the compiled files with `wp i18n make-mo <folder>` and, since WordPress 6.5, `wp i18n make-php <folder>` (the `.l10n.php` files take precedence over the `.mo`).
 - **Status:** after each successful change:
 

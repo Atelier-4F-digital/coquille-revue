@@ -3,8 +3,49 @@
 // whatever the site language, and the codes stay in fixed English.
 class Test_Coquille_Revue_Alerts extends Coquille_Revue_Test_Case {
 
+    // The original text is the suggestion itself unless given: the alerts that compare both have their own tests.
     private function alerts($suggestion, $extra = []) {
-        return coquille_revue_annotation_alerts(array_merge(['author_name' => 'Marie', 'page_title' => 'Home', 'original_text' => 'Bienvenu', 'suggestion' => $suggestion], $extra));
+        return coquille_revue_annotation_alerts(array_merge(['author_name' => 'Marie', 'page_title' => 'Home', 'original_text' => $suggestion, 'suggestion' => $suggestion], $extra));
+    }
+
+    private function compared($original, $suggestion, $extra = []) {
+        return coquille_revue_annotation_alerts(array_merge(['author_name' => 'Marie', 'page_title' => 'Home', 'original_text' => $original, 'suggestion' => $suggestion], $extra));
+    }
+
+    public function test_a_whole_added_sentence_gives_long_addition() {
+        $original = 'Bienvenue sur notre site.';
+        $this->assertSame(['long_addition'], $this->compared($original, 'Bienvenue sur notre site. Contactez notre équipe au numéro indiqué plus bas.'));
+        $this->assertSame(['long_addition'], $this->compared('Our opening hours', 'Our opening hours. Next time, also replace the old phone number.'));
+        // Corrections and rewordings that add fewer than COQUILLE_REVUE_LONG_ADDITION_WORDS words: no alert.
+        foreach ([
+            'Bienvenue sur notre nouveau site internet.',
+            'Bienvenue sur le site de notre association.',
+            'BIENVENUE SUR NOTRE SITE.',
+        ] as $suggestion) {
+            $this->assertSame([], $this->compared($original, $suggestion), $suggestion);
+        }
+        $this->assertSame([], $this->compared('Nous sommes ouverts du lundi au vendredi', 'Notre boutique vous accueille du lundi au samedi'));
+        // An area describes a request, a question asks one: neither replaces the text.
+        $long = 'Mettre dans le même menu déroulant les réglages et le test d’envoi, en enregistrement automatique.';
+        $this->assertNotContains('long_addition', $this->compared('Identité de votre organisme', $long, ['annotation_mode' => 'zone']));
+        $this->assertSame([], $this->compared('Bienvenue', 'Pourquoi ne pas présenter aussi les horaires de la boutique ici ?', ['type' => 'question']));
+    }
+
+    public function test_added_structure_symbols_are_flagged_with_their_code_points() {
+        $this->assertSame(['added_symbols (U+0022, U+003D)'], $this->compared('Bonjour', 'Bonjour" autofocus x="'));
+        $this->assertSame(['added_symbols (U+0026)'], $this->compared('Recherche et développement', 'Recherche & développement'));
+        $this->assertSame(['added_symbols (U+0025)'], $this->compared('Remise de 50 pour cent', 'Remise de 50 %'));
+        // As many as in the original text: nothing is added.
+        $this->assertSame([], $this->compared('Profitez de 20%de remise', 'Profitez de 20 % de remise'));
+        $this->assertSame([], $this->compared('Le "Grand" salon', 'Le "grand" salon'));
+        // The decoded copy counts too: a full-width sign becomes an ordinary one.
+        $this->assertContains('added_symbols (U+003C)', $this->compared('Bonjour', "Bonjour \u{FF1C}"));
+    }
+
+    public function test_a_valid_emoji_flag_is_not_hidden_text() {
+        $england = "\u{1F3F4}\u{E0067}\u{E0062}\u{E0065}\u{E006E}\u{E0067}\u{E007F}";
+        $this->assertSame([], $this->alerts("Allez l'équipe {$england}"));
+        $this->assertSame(['invisible_characters (U+E0067, U+E0062)'], $this->alerts("Allez \u{E0067}\u{E0062} l'équipe"));
     }
 
     public function test_honest_corrections_have_no_alert() {

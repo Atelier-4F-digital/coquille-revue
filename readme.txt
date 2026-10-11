@@ -24,11 +24,11 @@ A pencil button floats on every page. A reviewer turns on review mode, selects s
 = Processing annotations =
 
 * Admin page with one tab per status (pending, in progress, applied, rejected, archived), 50 annotations per page, and one-click status changes.
-* **Alerts**, shown under each suggestion, flag annotations that need a careful look before anything is applied: web addresses, code or commands, invisible characters, mixed alphabets inside a word, and wording that gives instructions or claims authority. Alerts are computed by simple rules inside WordPress, without any AI.
+* **Alerts**, shown under each suggestion, flag annotations that need a careful look before anything is applied: web addresses, code or commands, invisible characters, mixed alphabets inside a word, wording that gives instructions or claims authority, a whole sentence added to the original text, and added structure characters such as quotes or braces. Alerts are computed by simple rules inside WordPress, without any AI.
 * Exports of the current tab as CSV (spreadsheet), JSON or Markdown.
 * Optional thank-you email (per site, on by default): when an annotation is marked as applied, its author receives a short generic message with the site name, the date and a link to the home page, never the text they typed. At most one email per address per day and 20 per site per day.
 * A digest email tells the site administrator about new annotations, at most once every 15 minutes.
-* WP-CLI commands `wp coquille-revue list|locate|apply|status`: `locate` finds where the original text is stored (posts, menus, options, custom fields, terms, theme and plugin files, translations); `apply` replaces it word for word in the database and refuses to add code, tags, links or shortcodes. Help texts, messages and JSON keys are in English.
+* WP-CLI commands `wp coquille-revue list|locate|apply|status`: `locate` finds where the original text is stored (posts, menus, options, custom fields, terms, theme and plugin files, translations); `apply` replaces it word for word in the database and refuses to add code, tags, links, shortcodes or hidden characters. Help texts, messages and JSON keys are in English.
 
 = Apply corrections with Claude Code (optional) =
 

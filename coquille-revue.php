@@ -652,9 +652,9 @@ function coquille_revue_save_annotation(WP_REST_Request $request) {
         return new WP_Error('invalid_url', __('Invalid page address.', 'coquille-revue'), ['status' => 400]);
     }
 
-    // Caractères de contrôle bidirectionnel : ils servent à cacher ou inverser du texte
+    // Contrôles bidirectionnels, caractères Tag hors drapeau et U+061C : ils servent à cacher ou inverser du texte
     foreach (['originalText', 'suggestion', 'reviewerName', 'pageTitle', 'xpath', 'cssSelector'] as $f) {
-        if (preg_match('/[\x{202A}-\x{202E}\x{2066}-\x{2069}]/u', (string) $request->get_param($f))) {
+        if (coquille_revue_has_forbidden_chars($request->get_param($f))) {
             return new WP_Error('invalid_chars', __('Characters not allowed.', 'coquille-revue'), ['status' => 400]);
         }
     }
@@ -1212,6 +1212,72 @@ const COQUILLE_REVUE_INVISIBLE_PATTERN = '~[\p{Cf}\p{Co}\x{034F}\x{115F}\x{1160}
 // dans un texte sans écriture chinoise, japonaise ou coréenne (qui les emploie normalement).
 const COQUILLE_REVUE_LOOKALIKE_SCRIPTS = '\p{Cyrillic}\p{Greek}\p{Armenian}\p{Cherokee}\p{Coptic}\p{Lisu}\p{Canadian_Aboriginal}';
 
+// Drapeau émoji à séquence de caractères Tag (drapeau noir U+1F3F4, code de la subdivision, U+E007F), par exemple
+// celui de l'Angleterre : ses caractères Tag sont admis.
+const COQUILLE_REVUE_FLAG_PATTERN = '~\x{1F3F4}[\x{E0030}-\x{E0039}\x{E0061}-\x{E007A}]{3,7}\x{E007F}~u';
+
+// Refusés à l'envoi et par « apply », même après examen : contrôles bidirectionnels (ils cachent ou inversent du texte),
+// caractères Tag U+E0000–U+E007F hors drapeau (un texte invisible qu'une IA lit) et U+061C.
+const COQUILLE_REVUE_FORBIDDEN_PATTERN = '~[\x{202A}-\x{202E}\x{2066}-\x{2069}\x{061C}\x{E0000}-\x{E007F}]~u';
+
+// Alerte long_addition : la suggestion contient au moins ce nombre de mots absents du texte d'origine, soit une phrase
+// entière ajoutée plutôt qu'une correction.
+const COQUILLE_REVUE_LONG_ADDITION_WORDS = 6;
+
+// Alerte added_symbols : caractères de structure (JSON, HTML, attributs, gabarits) plus nombreux dans la suggestion que
+// dans le texte d'origine. « apply » refuse toujours d'ajouter les sept premiers, et les trois derniers (" % =)
+// seulement après examen des alertes.
+const COQUILLE_REVUE_STRICT_SYMBOLS   = '\\<>&{}`';
+const COQUILLE_REVUE_REVIEWED_SYMBOLS = '"%=';
+
+function coquille_revue_without_flags($text) {
+    return preg_replace(COQUILLE_REVUE_FLAG_PATTERN, '', (string) $text) ?? (string) $text;
+}
+
+// true si le texte contient un caractère refusé (ou ne peut pas être lu).
+function coquille_revue_has_forbidden_chars($text) {
+    return preg_match(COQUILLE_REVUE_FORBIDDEN_PATTERN, coquille_revue_without_flags($text)) !== 0;
+}
+
+// Caractères de structure de $symbols plus nombreux dans $to que dans $from, sur le texte tel quel et sur sa copie décodée.
+function coquille_revue_added_symbols($from, $to, $symbols) {
+    $pairs = [[(string) $from, (string) $to], [coquille_revue_normalize_text($from), coquille_revue_normalize_text($to)]];
+    $added = [];
+    foreach (str_split($symbols) as $symbol) {
+        foreach ($pairs as [$before, $after]) {
+            if (substr_count($after, $symbol) > substr_count($before, $symbol)) {
+                $added[] = $symbol;
+                break;
+            }
+        }
+    }
+    return $added;
+}
+
+// Alertes qui comparent la suggestion au texte d'origine : [code => complément], par exemple
+// ['added_symbols' => ' (U+0022)']. Les mots sont comparés sans la casse des lettres ASCII.
+function coquille_revue_comparison_alerts($original, $suggestion) {
+    $words = fn($text) => preg_match_all('~[\p{L}\p{N}]+~u', strtolower((string) $text), $m) ? $m[0] : [];
+    $left  = array_count_values($words($original));
+    $new   = 0;
+    foreach ($words($suggestion) as $word) {
+        if (!empty($left[$word])) {
+            $left[$word]--;
+        } else {
+            $new++;
+        }
+    }
+    $alerts = [];
+    if ($new >= COQUILLE_REVUE_LONG_ADDITION_WORDS) {
+        $alerts['long_addition'] = '';
+    }
+    $symbols = coquille_revue_added_symbols($original, $suggestion, COQUILLE_REVUE_STRICT_SYMBOLS . COQUILLE_REVUE_REVIEWED_SYMBOLS);
+    if ($symbols) {
+        $alerts['added_symbols'] = ' (' . implode(', ', array_map(fn($c) => sprintf('U+%04X', ord($c)), $symbols)) . ')';
+    }
+    return $alerts;
+}
+
 // Copie d'un texte pour les contrôles seulement : séquences \uXXXX, entités HTML et %XX décodées (trois passes
 // pour un double encodage), formes pleine chasse et de compatibilité ramenées à l'ASCII, invisibles retirés.
 // Un contenu stocké en JSON (bloc, constructeur de page) redonnerait du HTML actif à partir de ces formes.
@@ -1219,6 +1285,16 @@ const COQUILLE_REVUE_LOOKALIKE_SCRIPTS = '\p{Cyrillic}\p{Greek}\p{Armenian}\p{Ch
 // html_entity_decode() ne fait pas. Seuls les %XX ASCII sont décodés (les seuls utiles pour écrire du code) :
 // un octet au-delà de 0x7F ferait de l'UTF-8 invalide à partir d'une simple coquille (« 20%de remise »).
 function coquille_revue_normalize_text($text) {
+    $text = coquille_revue_decode_text($text);
+    if (class_exists('Normalizer')) {
+        $text = Normalizer::normalize($text, Normalizer::FORM_KC) ?: $text;
+    }
+    $text = preg_replace_callback('~[\x{FF01}-\x{FF5E}]~u', fn($m) => chr(coquille_revue_codepoint($m[0]) - 0xFEE0), $text) ?? $text;
+    return preg_replace(COQUILLE_REVUE_INVISIBLE_PATTERN, '', $text) ?? $text;
+}
+
+// Décodage seul (\uXXXX, références numériques et entités HTML, %XX ASCII), trois passes pour un double encodage.
+function coquille_revue_decode_text($text) {
     $text = (string) $text;
     for ($i = 0; $i < 3; $i++) {
         $before = $text;
@@ -1228,11 +1304,7 @@ function coquille_revue_normalize_text($text) {
         $text   = preg_replace_callback('~%([0-7][0-9a-f])~i', fn($m) => chr((int) hexdec($m[1])), $text) ?? $text;
         if ($text === $before) break;
     }
-    if (class_exists('Normalizer')) {
-        $text = Normalizer::normalize($text, Normalizer::FORM_KC) ?: $text;
-    }
-    $text = preg_replace_callback('~[\x{FF01}-\x{FF5E}]~u', fn($m) => chr(coquille_revue_codepoint($m[0]) - 0xFEE0), $text) ?? $text;
-    return preg_replace(COQUILLE_REVUE_INVISIBLE_PATTERN, '', $text) ?? $text;
+    return $text;
 }
 
 // Signaux détectés sans IA dans les champs saisis par le visiteur. Un signal n'est pas une preuve :
@@ -1284,7 +1356,7 @@ function coquille_revue_annotation_alerts($row, $labels = []) {
     $checks = [
         'web_address'              => [[COQUILLE_REVUE_LINK_PATTERN, [$text, $decoded]]],
         'code_or_command'          => [[$code_pattern, [$text, $decoded]]],
-        'invisible_characters'     => [[COQUILLE_REVUE_INVISIBLE_PATTERN, [$text, $technical]]],
+        'invisible_characters'     => [[COQUILLE_REVUE_INVISIBLE_PATTERN, [coquille_revue_without_flags($text), coquille_revue_without_flags($technical)]]],
         'mixed_scripts'            => [['~\p{Latin}[' . $lookalike . ']|[' . $lookalike . ']\p{Latin}'
             . '|^(?![\s\S]*[\p{Han}\p{Hiragana}\p{Katakana}\p{Hangul}])[\s\S]*?' . $fullwidth . '~u', [$text, $technical]]],
         'instruction_or_authority' => [
@@ -1315,11 +1387,18 @@ function coquille_revue_annotation_alerts($row, $labels = []) {
         }
         if (!$found) continue;
         $alert = $labels[$code] ?? $code;
-        if (isset($codepoints[$code]) && preg_match_all($codepoints[$code], $text . "\n" . $technical, $m)) {
+        if (isset($codepoints[$code]) && preg_match_all($codepoints[$code], coquille_revue_without_flags($text . "\n" . $technical), $m)) {
             $points = array_unique(array_map(fn($c) => sprintf('U+%04X', coquille_revue_codepoint($c)), $m[0]));
             $alert .= ' (' . implode(', ', $points) . ')';
         }
         $alerts[] = $alert;
+    }
+    // La suggestion d'un texte remplace ce texte : elle est comparée à l'original. Une zone (description en langage
+    // courant) et une question ne remplacent rien.
+    if (($row['annotation_mode'] ?? 'text') !== 'zone' && ($row['type'] ?? 'correction') !== 'question') {
+        foreach (coquille_revue_comparison_alerts($row['original_text'] ?? '', $row['suggestion'] ?? '') as $code => $detail) {
+            $alerts[] = ($labels[$code] ?? $code) . $detail;
+        }
     }
     if ($unreadable) {
         $alerts[] = $labels['unreadable_text'] ?? 'unreadable_text';
@@ -1633,7 +1712,9 @@ if (defined('WP_CLI') && WP_CLI) {
          *
          * Files (theme, plugins, translations) are edited with the Claude Code editing tool.
          * Refuses: a text that is not found or shorter than 2 characters, several occurrences (unless --all),
-         * code, or tags, links or shortcodes that are not already in the original text, a question, an area annotation without an approved text, an annotation
+         * code, or tags, links, shortcodes or the characters \ < > & { } ` that are not already in the original text
+         * (as many times), hidden characters (bidirectional controls, Tag characters, U+061C), a text that the checks
+         * cannot read, a question, an area annotation without an approved text, an annotation or an approved text
          * with alerts (unless --alerts-reviewed), an option outside the list of site texts (blogname,
          * blogdescription, widget_*, theme_mods_*, ACF options_*; filter coquille_revue_cli_writable_options).
          *
@@ -1684,7 +1765,11 @@ if (defined('WP_CLI') && WP_CLI) {
             if ($row['annotation_mode'] === 'zone' && !isset($assoc['text-file'])) {
                 WP_CLI::error('Area annotation: pass the replacement text approved by the user with --text-file.');
             }
+            // Un texte validé différent de la suggestion passe par les mêmes alertes, comme s'il était la suggestion.
             $alerts = coquille_revue_annotation_alerts($row);
+            if (isset($assoc['text-file'])) {
+                $alerts = array_values(array_unique(array_merge($alerts, coquille_revue_annotation_alerts(['suggestion' => $replace, 'annotation_mode' => 'text', 'type' => 'correction'] + $row))));
+            }
             if ($alerts && empty($assoc['alerts-reviewed'])) {
                 WP_CLI::error('Annotation with alerts: ' . implode(', ', $alerts) . '. Nothing was changed.');
             }
@@ -1933,6 +2018,14 @@ if (defined('WP_CLI') && WP_CLI) {
                     }
                 }
             }
+            // Même après examen des alertes : caractères cachés (aussi sous forme encodée) et caractères de structure ajoutés.
+            if (coquille_revue_has_forbidden_chars($replace) || coquille_revue_has_forbidden_chars(coquille_revue_decode_text($replace))) {
+                WP_CLI::error('The replacement text contains hidden characters (bidirectional controls, Tag characters or U+061C): refused.');
+            }
+            $symbols = coquille_revue_added_symbols($search, $replace, COQUILLE_REVUE_STRICT_SYMBOLS);
+            if ($symbols) {
+                WP_CLI::error('The replacement text adds characters that are not in the original text (' . implode(' ', $symbols) . '): refused.');
+            }
         }
 
         // true si le motif trouve le texte ; un texte illisible pour l'expression régulière est refusé.
@@ -2094,6 +2187,8 @@ function coquille_revue_admin_page() {
         'invisible_characters'     => __('invisible characters', 'coquille-revue'),
         'mixed_scripts'            => __('mixed alphabets', 'coquille-revue'),
         'instruction_or_authority' => __('instruction or authority', 'coquille-revue'),
+        'long_addition'            => __('added sentence', 'coquille-revue'),
+        'added_symbols'            => __('added symbols', 'coquille-revue'),
         'unreadable_text'          => __('unreadable text', 'coquille-revue'),
     ];
     /* translators: date and time format of the annotation table, see https://www.php.net/manual/datetime.format.php */
