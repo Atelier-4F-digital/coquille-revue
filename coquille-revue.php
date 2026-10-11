@@ -77,13 +77,16 @@ const COQUILLE_REVUE_STATUSES       = ['pending', 'in_progress', 'applied', 'rej
 const COQUILLE_REVUE_ADMIN_PER_PAGE = 50;
 const COQUILLE_REVUE_EXPORT_BATCH   = 500;   // les exports lisent la base par lots de cette taille
 
-// Adresse web, même sans « http » : mailto:, tel:, data:, //hôte, www. et domaines nus aux extensions courantes.
-// Les extensions qui sont aussi des mots courants (de, la, il, me, in, it, to…) sont exclues : « phrase.La suite »,
-// une espace oubliée, est justement ce qu'un relecteur corrige. Répétitions bornées (63 caractères par partie,
-// 10 parties au plus) : sans borne, un texte « a.a.a.a… » coûte un temps quadratique à chaque affichage.
+// Adresse web, même sans « http » : mailto:, tel:, data:, //hôte, www., raccourcisseurs connus (t.me, bit.ly…)
+// et domaines nus aux extensions courantes, avec leur chemin. Les extensions qui sont aussi des mots courants
+// (la, il, in, it, to…) sont exclues : « phrase.La suite », une espace oubliée, est justement ce qu'un relecteur
+// corrige. .de et .me ne comptent qu'en minuscules et après un nom d'au moins 3 caractères (« evil.de »), jamais
+// pour « phrase.De plus ». Répétitions bornées (63 caractères par partie, 10 parties au plus) : sans borne,
+// un texte « a.a.a.a… » coûte un temps quadratique à chaque affichage.
 const COQUILLE_REVUE_LINK_PATTERN = '~(?:https?:|mailto:|tel:\+?\d|data:[a-z]+/|//[a-z0-9-]+\.|www\.)\S*'
-    . '|\b[a-z0-9-]{1,63}(?:\.[a-z0-9-]{1,63}){0,8}\.(?:com|net|org|info|biz|io|co|app|dev|xyz|icu|online|site|store|shop|top|club|vip|buzz|cfd|sbs|bond|cyou|monster|lol'
-    . '|fr|eu|ru|su|cn|uk|ly|gg|cc|tv|tk|ml|ga|cf|gq|pw|ws|fm|nl|pl|br|jp|kr|ua|kz|ir|cz|ch|mc|tn|dz|sn|cm|gl|vn|tr|example)\b~iu';
+    . '|(?:\b(?:t\.me|wa\.me|bit\.ly|tinyurl\.com|goo\.gl|ow\.ly|is\.gd|buff\.ly|rebrand\.ly|cutt\.ly|shorturl\.at|lnkd\.in)'
+    . '|\b(?:[a-z0-9-]{1,63}\.){0,8}(?:[a-z0-9-]{1,63}\.(?:com|net|org|info|biz|io|co|app|dev|xyz|icu|online|site|store|shop|top|club|vip|buzz|cfd|sbs|bond|cyou|monster|lol'
+    . '|fr|eu|ru|su|cn|uk|ly|gg|cc|tv|tk|ml|ga|cf|gq|pw|ws|fm|nl|pl|br|jp|kr|ua|kz|ir|cz|ch|mc|tn|dz|sn|cm|gl|vn|tr|example)|[a-z0-9-]{3,63}\.(?-i:de|me)))\b(?:[/?#]\S*)?~iu';
 
 // Données personnelles
 const COQUILLE_REVUE_IP_RETENTION_DAYS    = 30;   // adresses IP
@@ -1212,12 +1215,17 @@ const COQUILLE_REVUE_LOOKALIKE_SCRIPTS = '\p{Cyrillic}\p{Greek}\p{Armenian}\p{Ch
 // Copie d'un texte pour les contrôles seulement : séquences \uXXXX, entités HTML et %XX décodées (trois passes
 // pour un double encodage), formes pleine chasse et de compatibilité ramenées à l'ASCII, invisibles retirés.
 // Un contenu stocké en JSON (bloc, constructeur de page) redonnerait du HTML actif à partir de ces formes.
+// Comme un navigateur, une référence numérique se décode aussi sans point-virgule (&#106avascript:), ce que
+// html_entity_decode() ne fait pas. Seuls les %XX ASCII sont décodés (les seuls utiles pour écrire du code) :
+// un octet au-delà de 0x7F ferait de l'UTF-8 invalide à partir d'une simple coquille (« 20%de remise »).
 function coquille_revue_normalize_text($text) {
     $text = (string) $text;
     for ($i = 0; $i < 3; $i++) {
         $before = $text;
         $text   = preg_replace('~\\\\u([0-9a-f]{4})~i', '&#x$1;', $text) ?? $text;
-        $text   = rawurldecode(html_entity_decode($text, ENT_QUOTES | ENT_HTML5, 'UTF-8'));
+        $text   = preg_replace_callback('~&#(x[0-9a-f]+|[0-9]+);?~i', fn($m) => html_entity_decode('&#' . $m[1] . ';', ENT_QUOTES | ENT_HTML5, 'UTF-8'), $text) ?? $text;
+        $text   = html_entity_decode($text, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        $text   = preg_replace_callback('~%([0-7][0-9a-f])~i', fn($m) => chr((int) hexdec($m[1])), $text) ?? $text;
         if ($text === $before) break;
     }
     if (class_exists('Normalizer')) {
@@ -1239,36 +1247,50 @@ function coquille_revue_annotation_alerts($row, $labels = []) {
     $text      = implode("\n", [$author, $row['page_title'] ?? '', $row['original_text'] ?? '', $row['suggestion'] ?? '']);
     $decoded   = coquille_revue_normalize_text($text);
     // Position dans la page et chemin de l'adresse : saisis eux aussi par le visiteur, mais faits de noms de balises,
-    // de classes et de segments. Seuls les invisibles, les alphabets mélangés et les consignes y sont cherchés,
-    // les séparateurs (- _ . / > # …) étant lus comme des espaces.
+    // de classes et de segments. Seuls les invisibles, les alphabets mélangés et les formules adressées à une IA ou
+    // de faux accord y sont cherchés (un nom isolé comme admin, password ou redirect y est banal), les séparateurs
+    // (- _ . / > # …) étant lus comme des espaces, champ par champ.
     $path      = rawurldecode((string) wp_parse_url((string) ($row['url'] ?? ''), PHP_URL_PATH));
-    $technical = implode("\n", [$row['css_selector'] ?? '', $row['xpath'] ?? '', $path]);
-    $words     = preg_replace('~[-_./#>:=()\[\]]+~', ' ', $technical) ?? $technical;
+    $fields    = [(string) ($row['css_selector'] ?? ''), (string) ($row['xpath'] ?? ''), $path];
+    $technical = implode("\n", $fields);
+    $words     = array_map(fn($field) => preg_replace('~[-_./#>:=()\[\]\s]+~', ' ', $field) ?? $field, $fields);
 
     // Formules de consigne ou d'autorité en français ET en anglais, cherchées ensemble quelle que soit la langue du site
-    // (jamais traduites). « AI » en majuscules seulement : en minuscules, il se confondrait avec « j'ai ».
-    $instruction_fr = 'ignorer?|ignorez|instructions?|consignes?|claude|ia|assistant|annotations?|automatique\w*|redirect\w*|redirig\w*'
-        . '|sans (demander|attendre|confirm\w*|valid\w*|reconfirm\w*)|(pas besoin|inutile) de (demander|confirmer|valider)|feu vert'
-        . '|(déjà|a|ont|avons) (déjà )?(validé|approuvé)e?s?|(validée?|approuvée?) par|administrateur|mots? de passe|password|secrets?';
-    $instruction_en = 'ignor(e|ed|es|ing)|disregard\w*|forget (all|everything|previous|the above|your)|instructions?|system (prompt|message|instructions?)'
-        . '|developer mode|jailbreak\w*|chatgpt|gpt|llm|language model|(?-i:AI)|claude|assistant|annotations?|automatic(ally)?|redirect\w*'
-        . '|without (asking|confirm\w*|validat\w*|approv\w*|review\w*|checking)|no need to (ask|confirm|validate|check|review)|go ahead'
-        . '|(do not|don[\'’]t|never) (ask|confirm|tell|mention|report|flag|show)|already (approved|validated|confirmed|authori[sz]ed)'
-        . '|pre-?(approved|validated|authori[sz]ed)|(approved|validated|authori[sz]ed) by'
+    // (jamais traduites). « AI » en majuscules seulement : en minuscules, il se confondrait avec « j'ai ». Chaque espace
+    // des listes accepte n'importe quel blanc.
+    // Formules adressées à une IA, consignes pour une relecture future et faux accords : cherchées dans tous les champs.
+    $instruction_ai = '(hey|hi|hello|dear|note|message|attention|for|to|pour|à) ((the|l)\s*[\'’]?\s*)?(claude|chatgpt)'
+        . '|(hey|hi|hello|dear|note|message|attention) ((the|l)\s*[\'’]?\s*)?(ai|ia|gpt|llm)|(for|to|pour|à) (the|l)\s*[\'’]?\s*(ai|ia|gpt|llm)'
+        . '|chatgpt|llm|language model|system (prompt|message|instructions?)|developer mode|jailbreak\w*'
+        . '|ignor(e|ez|er) (all|any|every|the|previous|prior|above|earlier|les|la|le|tout|toutes|tous|ces|cette|précédent\w*)'
+        . '|disregard\w*|forget (all|everything|previous|the above|your)|oublie[rz]? (tout|les|toutes|ces|cette)'
+        . '|without (asking|confirm\w*|validat\w*|approv\w*|review\w*|checking)|no need to (ask|confirm|validate|check|review)'
+        . '|sans (demander|attendre|confirm\w*|valid\w*|reconfirm\w*)|(pas besoin|inutile) de (demander|confirmer|valider)'
+        . '|(do not|don[\'’]?t|never) (ask|confirm|tell|mention|report|flag|show)'
+        . '|already (approved|validated|confirmed|authori[sz]ed)|pre(-| )?(approved|validated|authori[sz]ed)|(approved|validated|authori[sz]ed) by'
         . '|(user|owner|admin\w*|editor|team) (has |have )?(approved|validated|confirmed|agreed|authori[sz]ed)'
-        . '|admin(istrator)?s?|override|passwords?|api keys?|access tokens?|private keys?|secrets?';
+        . '|(déjà|a|ont|avons) (déjà )?(validé|approuvé)e?s?|(validée?|approuvée?) par|go ahead|feu vert'
+        . '|silently|quietly|(next|future) (pass|run|review)|skip (the )?(confirmation|review|check)|discrètement|en silence|prochain passage';
+    // Mots isolés en plus pour les textes, l'auteur et le titre de la page.
+    $instruction_words = 'ignor(e|ed|es|ing|er|ez)|instructions?|consignes?|claude|gpt|ia|(?-i:AI)|assistant|annotations?|automat\w*'
+        . '|redirect\w*|redirig\w*|administrateur|admin(istrator)?s?|override|mots? de passe|passwords?|api keys?|access tokens?|private keys?|secrets?';
+    $instruction    = fn($list) => '~(*UCP)\b(' . str_replace(' ', '\s+', $list) . ')\b~iu';
     $lookalike      = COQUILLE_REVUE_LOOKALIKE_SCRIPTS;
     $fullwidth      = '[\x{FF21}-\x{FF3A}\x{FF41}-\x{FF5A}]';
-    // Code, y compris sous une forme encodée (<, &#60;, &lt;, %3C) ou en attribut (on…=, style=).
+    // Code, y compris sous une forme encodée (<, &#60;, &#60 sans point-virgule, &lt;, %3C) ou en attribut (on…=, style=).
     $code_pattern = '~(<|>|`|\$\(|&&|\|\||\{\{|\[/?[a-z][a-z0-9_-]*[\s\]]|\.php\b|\b(curl|wget|eval|base64|wp-config|iframe|script|javascript|widget|shortcode)\b'
-        . '|\\\\u[0-9a-f]{4}|&#x?[0-9a-f]+;|&[a-z][a-z0-9]*;|%(2[0-9a-f]|3[a-f]|5[b-e]|60|7[b-d])|\bon[a-z]+\s*=|\bstyle\s*=)~iu';
+        . '|\\\\u[0-9a-f]{4}|&#x?[0-9a-f]+;?|&[a-z][a-z0-9]*;|%(2[0-9a-f]|3[a-f]|5[b-e]|60|7[b-d])|\bon[a-z]+\s*=|\bstyle\s*=)~iu';
+    // Pour chaque alerte : un ou plusieurs couples [motif, textes examinés].
     $checks = [
-        'web_address'              => [COQUILLE_REVUE_LINK_PATTERN, [$text, $decoded]],
-        'code_or_command'          => [$code_pattern, [$text, $decoded]],
-        'invisible_characters'     => [COQUILLE_REVUE_INVISIBLE_PATTERN, [$text, $technical]],
-        'mixed_scripts'            => ['~\p{Latin}[' . $lookalike . ']|[' . $lookalike . ']\p{Latin}'
-            . '|^(?![\s\S]*[\p{Han}\p{Hiragana}\p{Katakana}\p{Hangul}])[\s\S]*?' . $fullwidth . '~u', [$text, $technical]],
-        'instruction_or_authority' => ['~(*UCP)\b(' . $instruction_fr . '|' . $instruction_en . ')\b~iu', [$text, $decoded, $words]],
+        'web_address'              => [[COQUILLE_REVUE_LINK_PATTERN, [$text, $decoded]]],
+        'code_or_command'          => [[$code_pattern, [$text, $decoded]]],
+        'invisible_characters'     => [[COQUILLE_REVUE_INVISIBLE_PATTERN, [$text, $technical]]],
+        'mixed_scripts'            => [['~\p{Latin}[' . $lookalike . ']|[' . $lookalike . ']\p{Latin}'
+            . '|^(?![\s\S]*[\p{Han}\p{Hiragana}\p{Katakana}\p{Hangul}])[\s\S]*?' . $fullwidth . '~u', [$text, $technical]]],
+        'instruction_or_authority' => [
+            [$instruction($instruction_ai . '|' . $instruction_words), [$text, $decoded]],
+            [$instruction($instruction_ai), $words],
+        ],
     ];
     // Caractères qu'on ne peut pas voir à l'œil : on donne leurs points de code pour la vérification.
     $codepoints = [
@@ -1279,14 +1301,16 @@ function coquille_revue_annotation_alerts($row, $labels = []) {
     // Un texte illisible pour les expressions régulières (UTF-8 invalide, limite de calcul atteinte) ne doit pas
     // passer pour sain : il donne sa propre alerte.
     $unreadable = false;
-    foreach ($checks as $code => [$pattern, $subjects]) {
+    foreach ($checks as $code => $tests) {
         $found = false;
-        foreach ($subjects as $subject) {
-            $result = preg_match($pattern, $subject);
-            $unreadable = $unreadable || $result === false;
-            if ($result) {
-                $found = true;
-                break;
+        foreach ($tests as [$pattern, $subjects]) {
+            foreach ($subjects as $subject) {
+                $result = preg_match($pattern, $subject);
+                $unreadable = $unreadable || $result === false;
+                if ($result) {
+                    $found = true;
+                    break 2;
+                }
             }
         }
         if (!$found) continue;

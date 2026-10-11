@@ -77,6 +77,9 @@ class Test_Coquille_Revue_Cli extends Coquille_Revue_Test_Case {
             'Bonjour" style="position:fixed;inset:0;opacity:0',
             "\u{FF1C}script\u{FF1E}alert(1)\u{FF1C}/script\u{FF1E}",
             'data&colon;text/html,x',
+            '&#106avascript:alert(document.domain)//',
+            'java&#9script:alert(1)',
+            'jav&#x61script:alert(1)',
         ] as $suggestion) {
             $result = $this->apply($this->insert_annotation(['original_text' => 'Bonjour le monde', 'suggestion' => $suggestion]), $on);
             $this->assertIsString($result, $suggestion);
@@ -121,6 +124,25 @@ class Test_Coquille_Revue_Cli extends Coquille_Revue_Test_Case {
         $result = $this->apply($this->insert_annotation(['original_text' => $original, 'suggestion' => 'Écrivez sur www.atelier4f.fr ou à mailto:contact@atelier4f.fr pour un devis']), $on);
         $this->assertIsArray($result);
         $this->assertSame('Écrivez sur www.atelier4f.fr ou à mailto:contact@atelier4f.fr pour un devis', get_post($post)->post_content);
+    }
+
+    public function test_short_links_and_de_domains_cannot_be_added() {
+        $post = self::factory()->post->create(['post_content' => 'Rejoignez notre groupe']);
+        $on   = ['type' => 'post', 'ref' => (string) $post, 'alerts-reviewed' => true];
+        foreach (['Rejoignez notre groupe t.me/arnaque', 'Rejoignez notre groupe sur evil.de', 'Rejoignez notre groupe : bit.ly/x'] as $suggestion) {
+            $result = $this->apply($this->insert_annotation(['original_text' => 'Rejoignez notre groupe', 'suggestion' => $suggestion]), $on);
+            $this->assertStringContainsString('adds a link', $result, $suggestion);
+        }
+        $this->assertSame('Rejoignez notre groupe', get_post($post)->post_content);
+    }
+
+    public function test_a_typo_around_a_percent_sign_can_be_corrected() {
+        $post   = self::factory()->post->create(['post_content' => 'Profitez de 20%de remise ce mois-ci']);
+        $id     = $this->insert_annotation(['original_text' => 'Profitez de 20%de remise', 'suggestion' => 'Profitez de 20 % de remise']);
+        $this->assertSame([], coquille_revue_annotation_alerts($this->get_annotation($id)));
+        $report = $this->apply($id, ['type' => 'post', 'ref' => (string) $post]);
+        $this->assertIsArray($report, is_string($report) ? $report : '');
+        $this->assertSame('Profitez de 20 % de remise ce mois-ci', get_post($post)->post_content);
     }
 
     public function test_option_allow_list() {
