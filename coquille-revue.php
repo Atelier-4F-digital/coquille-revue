@@ -1486,7 +1486,8 @@ if (defined('WP_CLI') && WP_CLI) {
          * Finds where the original text of an annotation is stored (read-only).
          *
          * Searches the annotated page, posts and pages (title, content, excerpt, menus), options,
-         * custom fields (ACF), terms, theme and plugin files, and translations.
+         * custom fields (ACF), terms, theme and plugin files, and translations. A post occurrence
+         * gives the post status: a draft or a private post is not what visitors see.
          *
          * ## OPTIONS
          *
@@ -1503,7 +1504,7 @@ if (defined('WP_CLI') && WP_CLI) {
                 $like  = '%' . $wpdb->esc_like($text) . '%';
                 // phpcs:ignore WordPress.DB.DirectDatabaseQuery -- WP-CLI, read-only LIKE search across core tables (no WordPress API offers it).
                 $posts = $wpdb->get_results($wpdb->prepare(
-                    "SELECT ID, post_type, post_title, post_content, post_excerpt FROM {$wpdb->posts}
+                    "SELECT ID, post_type, post_status, post_title, post_content, post_excerpt FROM {$wpdb->posts}
                      WHERE post_type <> 'revision' AND post_status NOT IN ('trash', 'auto-draft')
                        AND (post_title LIKE %s OR post_content LIKE %s OR post_excerpt LIKE %s)",
                     $like, $like, $like
@@ -1511,7 +1512,7 @@ if (defined('WP_CLI') && WP_CLI) {
                 foreach ($posts as $p) {
                     foreach (['post_title', 'post_content', 'post_excerpt'] as $field) {
                         if ($n = substr_count($p[$field], $text)) {
-                            $occ[] = ['type' => 'post', 'ref' => (int) $p['ID'], 'field' => $field, 'count' => $n, 'form' => $form, 'info' => $p['post_type'] . ' "' . $p['post_title'] . '"'];
+                            $occ[] = ['type' => 'post', 'ref' => (int) $p['ID'], 'field' => $field, 'count' => $n, 'form' => $form, 'status' => $p['post_status'], 'info' => $p['post_type'] . ' "' . $p['post_title'] . '"'];
                         }
                     }
                 }
@@ -1567,7 +1568,7 @@ if (defined('WP_CLI') && WP_CLI) {
          *
          * Files (theme, plugins, translations) are edited with the Claude Code editing tool.
          * Refuses: a text that is not found or shorter than 2 characters, several occurrences (unless --all),
-         * added code, tags or links, a question, an area annotation without an approved text, an annotation
+         * code, or tags, links or shortcodes that are not already in the original text, a question, an area annotation without an approved text, an annotation
          * with alerts (unless --alerts-reviewed), an option outside the list of site texts (blogname,
          * blogdescription, widget_*, theme_mods_*, ACF options_*; filter coquille_revue_cli_writable_options).
          *
@@ -1593,7 +1594,8 @@ if (defined('WP_CLI') && WP_CLI) {
          * : post_title, post_content or post_excerpt (post), meta key (postmeta), name or description (term).
          *
          * [--text-file=<file>]
-         * : File holding the replacement text approved by the user, when it differs from the suggestion.
+         * : .txt file inside the .coquille-revue folder of the current directory, holding the replacement text
+         * approved by the user, when it differs from the suggestion.
          *
          * [--all]
          * : Replaces every occurrence in the chosen content.
@@ -1663,7 +1665,7 @@ if (defined('WP_CLI') && WP_CLI) {
                 WP_CLI::error('Original text not found at this location.');
             }
             if ($count > 1 && !$all) {
-                WP_CLI::error("{$count} occurrences at this location: show them to the user, then run the command again with --all if they confirm.");
+                WP_CLI::error("{$count} occurrences at this location: run the command again with --all --dry-run to show each of them to the user (each_occurrence), then with --all only if they confirm replacing all of them.");
             }
             $after = self::replace_deep($before, $search, $replace);
 
@@ -1677,6 +1679,9 @@ if (defined('WP_CLI') && WP_CLI) {
                 'before'      => self::excerpt($before, $search),
                 'after'       => self::excerpt($after, $replace),
             ];
+            if ($count > 1) {
+                $report['each_occurrence'] = self::excerpt($before, $search, true);
+            }
             if (!$dry) {
                 // Le filtre HTML de WordPress n'est pas appliqué ici : sans utilisateur en WP-CLI, il effacerait
                 // des contenus existants (vidéos intégrées…). Le remplacement lui-même n'ajoute jamais de balise.
@@ -1820,28 +1825,58 @@ if (defined('WP_CLI') && WP_CLI) {
             return array_values($found);
         }
 
+        // Texte validé par l'utilisateur, que la skill écrit dans le dossier de travail .coquille-revue/ : aucun autre
+        // fichier n'est lu, une annotation piégée ne peut donc pas faire recopier un secret (.env…) dans une page.
         private static function read_replacement($file) {
-            if (!is_file($file) || filesize($file) > COQUILLE_REVUE_MAX_TEXT_LENGTH * 4) {
-                WP_CLI::error('Replacement text file not found or too large.');
+            $dir  = realpath(getcwd() . '/.coquille-revue');
+            $real = realpath($file);
+            if (!$dir || !$real || strpos($real, $dir . DIRECTORY_SEPARATOR) !== 0 || strtolower(pathinfo($real, PATHINFO_EXTENSION)) !== 'txt'
+                || !is_file($real) || filesize($real) > COQUILLE_REVUE_MAX_TEXT_LENGTH * 4) {
+                WP_CLI::error('Replacement text file not found, too large, or not a .txt file inside the .coquille-revue folder of the current directory.');
             }
-            return preg_replace('/\R$/', '', (string) file_get_contents($file)); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents -- local file.
+            return preg_replace('/\R$/', '', (string) file_get_contents($real)); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents -- local file.
         }
 
-        // Une correction remplace du texte par du texte : ni code, ni balise, ni lien de plus que le texte d'origine.
+        // Une correction remplace du texte par du texte : aucun code, et aucune balise, aucun lien ni shortcode qui ne soit
+        // déjà, à l'identique, dans le texte d'origine (un lien remplacé par un autre est refusé). Les contrôles portent
+        // aussi sur une copie décodée (\uXXXX, entités HTML, %XX, pleine chasse) : dans un contenu stocké en JSON (bloc,
+        // constructeur de page), ces formes redeviendraient du HTML actif. Un texte illisible est refusé.
         private static function check_replacement($search, $replace) {
-            if (preg_match('~<\?|javascript:|\bon[a-z]+\s*=~i', $replace)) {
-                WP_CLI::error('The replacement text contains code: refused.');
+            $added = [
+                'adds HTML tags'   => '~<(?:!--|[!/?]?[a-z][a-z0-9-]*)~i',
+                'adds a link'      => COQUILLE_REVUE_LINK_PATTERN,
+                'adds a shortcode' => '~\[/?[a-z][a-z0-9_-]*~i', // un shortcode est du code que WordPress exécute à l'affichage
+            ];
+            foreach ([[$search, $replace], [coquille_revue_normalize_text($search), coquille_revue_normalize_text($replace)]] as [$from, $to]) {
+                $flat = preg_replace('~\s+~u', '', $to);
+                if ($flat === null || preg_match('~<\?|\bon[a-z]+\s*=|\bstyle\s*=~i', $to) !== 0 || preg_match('~(?:java|vb)script:~i', $flat) !== 0) {
+                    WP_CLI::error('The replacement text contains code: refused.');
+                }
+                foreach ($added as $what => $pattern) {
+                    $new = self::added_matches($pattern, $from, $to);
+                    if ($new === null || $new) {
+                        WP_CLI::error("The replacement text {$what}: refused.");
+                    }
+                }
             }
-            if (preg_match_all('~<[a-z!/]~i', $replace) > preg_match_all('~<[a-z!/]~i', $search)) {
-                WP_CLI::error('The replacement text adds HTML tags: refused.');
+        }
+
+        // Correspondances de $to qui ne sont pas, à l'identique et en même nombre, dans $from ; null si un texte est illisible.
+        private static function added_matches($pattern, $from, $to) {
+            if (preg_match_all($pattern, $from, $old) === false || preg_match_all($pattern, $to, $new) === false) {
+                return null;
             }
-            if (preg_match_all(COQUILLE_REVUE_LINK_PATTERN, $replace) > preg_match_all(COQUILLE_REVUE_LINK_PATTERN, $search)) {
-                WP_CLI::error('The replacement text adds a link: refused.');
+            $left  = $old[0];
+            $added = [];
+            foreach ($new[0] as $match) {
+                $key = array_search($match, $left, true);
+                if ($key === false) {
+                    $added[] = $match;
+                } else {
+                    unset($left[$key]);
+                }
             }
-            // Un shortcode ([nom ...]) est du code que WordPress exécute à l'affichage
-            if (preg_match_all('~\[/?[a-z][a-z0-9_-]*~i', $replace) > preg_match_all('~\[/?[a-z][a-z0-9_-]*~i', $search)) {
-                WP_CLI::error('The replacement text adds a shortcode: refused.');
-            }
+            return $added;
         }
 
         private static function count_deep($value, $text) {
@@ -1865,11 +1900,18 @@ if (defined('WP_CLI') && WP_CLI) {
             return $value;
         }
 
-        private static function excerpt($value, $needle) {
-            $flat = is_string($value) ? $value : wp_json_encode($value, JSON_UNESCAPED_UNICODE);
-            $pos  = $needle === '' ? false : mb_strpos($flat, $needle);
-            $from = $pos === false ? 0 : max(0, $pos - 60);
-            return mb_substr($flat, $from, mb_strlen($needle) + 120);
+        // Extrait autour de la première occurrence, ou de chacune (10 au plus) avec $all, pour que l'utilisateur voie
+        // où se trouve chaque remplacement. Sans l'extension mbstring : WordPress ne fournit que mb_substr et mb_strlen.
+        private static function excerpt($value, $needle, $all = false) {
+            $flat  = is_string($value) ? $value : (string) wp_json_encode($value, JSON_UNESCAPED_UNICODE);
+            $cut   = fn($pos) => mb_substr($flat, $pos === false ? 0 : max(0, mb_strlen(substr($flat, 0, $pos)) - 60), mb_strlen($needle) + 120);
+            $pos   = $needle === '' ? false : strpos($flat, $needle);
+            $list  = [$cut($pos)];
+            while ($all && $pos !== false && count($list) < 10) {
+                $pos = strpos($flat, $needle, $pos + strlen($needle));
+                if ($pos !== false) $list[] = $cut($pos);
+            }
+            return $all ? $list : $list[0];
         }
     }
 

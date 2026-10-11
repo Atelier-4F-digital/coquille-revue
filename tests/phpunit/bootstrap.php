@@ -13,6 +13,32 @@ if (!file_exists($coquille_revue_tests_dir . '/includes/functions.php')) {
 
 require_once $coquille_revue_tests_dir . '/includes/functions.php';
 
+// WP-CLI stand-in: the Coquille_Revue_CLI class is only declared when WP_CLI is defined (WordPress itself never reads
+// this constant). error() throws, so that a refusal can be checked; line() and success() keep the output.
+if (!defined('WP_CLI')) {
+    define('WP_CLI', true);
+
+    class Coquille_Revue_Test_CLI_Error extends Exception {}
+
+    class WP_CLI {
+        public static $output = [];
+
+        public static function error($message) {
+            throw new Coquille_Revue_Test_CLI_Error((string) $message); // phpcs:ignore WordPress.Security.EscapeOutput.ExceptionNotEscaped -- test stand-in, never printed.
+        }
+
+        public static function line($message = '') {
+            self::$output[] = (string) $message;
+        }
+
+        public static function success($message) {
+            self::$output[] = 'Success: ' . $message;
+        }
+
+        public static function add_command($name, $callable) {}
+    }
+}
+
 tests_add_filter('muplugins_loaded', function () {
     require dirname(__DIR__, 2) . '/coquille-revue.php';
 });

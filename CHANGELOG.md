@@ -47,6 +47,8 @@ All notable changes to Coquille Revue. Format based on [Keep a Changelog](https:
 
 - The thank-you email and the digest email to the administrator are sent in the site language, whatever the language of the person whose action triggers them.
 - Admin page: status, type and mode labels are translated (the stored values do not change), dates use a translatable format and numbers the number format of the language. Alerts are shown with translated labels.
+- `wp coquille-revue locate` gives the status of each post where the text is found (a draft or a private post is not what visitors saw). When the text appears several times at one location, `apply --all --dry-run` shows an excerpt of each occurrence (`each_occurrence`), so that the user sees every place before replacing them all. `apply` no longer needs the PHP mbstring extension to build its report.
+- Claude Code plugin: an annotation whose text is not on the annotated page (`found_on_page` false) is classified as “not found”, even when the text exists elsewhere; when the page cannot be read, the user is told and asked to confirm the location; drafts and private posts are flagged; zones are located too; a long export is read in several parts and its count checked against `_meta.count`.
 - `wp coquille-revue locate` skips the plugin's own translation files in `wp-content/languages/plugins` (an annotation on a text of the Coquille Revue interface must not lead to editing a translation that the next update overwrites).
 - The annotation bubble is fixed on the screen, just above the bar (or at the top when it would hide the selected text): it stayed attached to the first screen of the page, so after scrolling it went off screen and the page jumped when typing. In review mode, the pencil and the messages move above the bar, where they used to hide the “Stop” button.
 - Touch screens: the bubble opens once the selection is stable (long press, then handles, which update it without erasing the remark) and without opening the keyboard; it sits above the virtual keyboard. The “click and drag over an area” hint is hidden, buttons are larger and fields use 16 px (iOS no longer zooms in when typing). The Enter key of the mobile keyboard shows “Send” and sends the remark, like the “Send” button.
@@ -78,6 +80,12 @@ All notable changes to Coquille Revue. Format based on [Keep a Changelog](https:
   - The display name of an account that manages annotations (editors and above by default) is set by the site and no longer checked: an editor called “admin” no longer marks all their annotations.
 - Link detection runs in linear time: a text such as `a.a.a.a…` could take about a second per annotation without PCRE JIT, enough to stall the admin page and the exports.
 - Rule 7 for Claude Code (exports) names every field typed by the visitor: original text, suggestion, author, page title, URL, CSS selector and XPath.
+- WP-CLI `apply`:
+  - the checks also read a decoded copy of the replacement text (`\uXXXX` sequences, HTML entities, `%XX`, full-width forms, spaces inside `javascript:`): in content stored as JSON (block attributes, page builders), these forms would become active HTML again;
+  - `style=` attributes are refused like `on…=` ones;
+  - a tag, an HTML comment, a link or a shortcode of the replacement text must appear verbatim in the original text: a link swapped for another one is refused, not only an extra one;
+  - a text that the checks cannot read is refused.
+- WP-CLI `apply --text-file` only reads a `.txt` file inside the `.coquille-revue` folder of the current directory (where the Claude Code plugin writes it): a booby-trapped annotation can no longer get a secret file such as `.env` copied into a page.
 
 ## [2.5.0] — 2026-10-09 — first public release
 
