@@ -1276,7 +1276,7 @@ const COQUILLE_REVUE_LOOKALIKE_SCRIPTS = '\p{Cyrillic}\p{Greek}\p{Armenian}\p{Ch
 
 // Drapeau émoji à séquence de caractères Tag (drapeau noir U+1F3F4, code de la subdivision, U+E007F), par exemple
 // celui de l'Angleterre : ses caractères Tag sont admis.
-const COQUILLE_REVUE_FLAG_PATTERN = '~\x{1F3F4}[\x{E0030}-\x{E0039}\x{E0061}-\x{E007A}]{3,7}\x{E007F}~u';
+const COQUILLE_REVUE_FLAG_SEQUENCE = '\x{1F3F4}[\x{E0030}-\x{E0039}\x{E0061}-\x{E007A}]{3,7}\x{E007F}';
 
 // Refusés à l'envoi et par « apply », même après examen : contrôles bidirectionnels (ils cachent ou inversent du texte),
 // caractères Tag U+E0000–U+E007F hors drapeau (un texte invisible qu'une IA lit) et U+061C.
@@ -1293,7 +1293,23 @@ const COQUILLE_REVUE_STRICT_SYMBOLS   = '\\<>&{}`';
 const COQUILLE_REVUE_REVIEWED_SYMBOLS = '"%=';
 
 function coquille_revue_without_flags($text) {
-    return preg_replace(COQUILLE_REVUE_FLAG_PATTERN, '', (string) $text) ?? (string) $text;
+    return preg_replace('~' . COQUILLE_REVUE_FLAG_SEQUENCE . '~u', '', (string) $text) ?? (string) $text;
+}
+
+// Pour les exports destinés à Claude Code : chaque caractère invisible ou trompeur devient visible sous la forme
+// [U+XXXX] (un drapeau émoji valide reste tel quel). La base garde le texte tel qu'il a été envoyé.
+function coquille_revue_visible_text($text) {
+    $parts = preg_split('~(' . COQUILLE_REVUE_FLAG_SEQUENCE . ')~u', (string) $text, -1, PREG_SPLIT_DELIM_CAPTURE);
+    if ($parts === false) {
+        return (string) $text;
+    }
+    $show = fn($m) => implode('', array_map(fn($c) => sprintf('[U+%04X]', coquille_revue_codepoint($c)), preg_split('//u', $m[0], -1, PREG_SPLIT_NO_EMPTY)));
+    foreach ($parts as $i => $part) {
+        if ($i % 2 === 0) { // les morceaux impairs sont les drapeaux
+            $parts[$i] = preg_replace_callback(COQUILLE_REVUE_INVISIBLE_PATTERN, $show, $part) ?? $part;
+        }
+    }
+    return implode('', $parts);
 }
 
 // true si le texte contient un caractère refusé (ou ne peut pas être lu).
@@ -1485,7 +1501,8 @@ function coquille_revue_claude_code_instructions() {
     return implode(' ', array_map(fn($i, $r) => '(' . ($i + 1) . ') ' . $r, array_keys($rules), $rules));
 }
 
-// Une annotation telle qu'exportée pour Claude Code : jamais d'e-mail, d'IP ni de navigateur ; dates à l'heure du site.
+// Une annotation telle qu'exportée pour Claude Code : jamais d'e-mail, d'IP ni de navigateur ; dates à l'heure du site ;
+// caractères invisibles rendus visibles, une fois les alertes calculées sur le texte enregistré.
 function coquille_revue_json_row($row) {
     unset($row['reviewer_email'], $row['reviewer_ip'], $row['user_agent'], $row['will_notify']);
     foreach (['created_at', 'applied_at'] as $date) {
@@ -1493,9 +1510,10 @@ function coquille_revue_json_row($row) {
             $row[$date] = coquille_revue_local_date($row[$date]);
         }
     }
-    $row['source'] = coquille_revue_annotation_source($row);
-    $row['alerts'] = coquille_revue_annotation_alerts($row);
-    return $row;
+    $source = coquille_revue_annotation_source($row);
+    $alerts = coquille_revue_annotation_alerts($row);
+    $row    = array_map(fn($value) => is_string($value) ? coquille_revue_visible_text($value) : $value, $row);
+    return $row + ['source' => $source, 'alerts' => $alerts];
 }
 
 // Export JSON destiné à Claude Code ; $count est le total quand $rows n'en contient qu'une partie.
@@ -1587,20 +1605,12 @@ function coquille_revue_output_markdown($status) {
     }
 }
 
-// Ligne traduite du Markdown (titres pour la personne qui lit le fichier) : ramenée à une seule ligne,
-// pour qu'une traduction ne puisse pas y ajouter de titre, de bloc ou de consigne sur une ligne à part.
-function coquille_revue_markdown_line($text) {
-    return trim((string) preg_replace('/\s+/u', ' ', (string) $text));
-}
-
+// Tout le fichier Markdown est en anglais fixe, titres compris : aucune traduction ne peut y ajouter de ligne.
 function coquille_revue_markdown_head($status, $count) {
-    $date  = current_time('Y-m-d H:i');
-    /* translators: %s: status of the exported annotations, as a code (pending, applied…) */
-    $md  = '# ' . coquille_revue_markdown_line(sprintf(__('Coquille Revue — %s export', 'coquille-revue'), "`{$status}`")) . "\n\n";
-    /* translators: 1: date and time of the export, 2: number of annotations, 3: site address */
-    $md .= '_' . coquille_revue_markdown_line(sprintf(_n('Generated on %1$s — %2$d annotation · %3$s', 'Generated on %1$s — %2$d annotations · %3$s', $count, 'coquille-revue'), $date, $count, home_url())) . "_\n\n";
+    $count = (int) $count;
+    $md    = "# Coquille Revue — `{$status}` export\n\n";
+    $md   .= '_Generated on ' . current_time('Y-m-d H:i') . " — {$count} annotation" . ($count === 1 ? '' : 's') . ' · ' . home_url() . "_\n\n";
 
-    // Consignes pour Claude Code : anglais fixe, jamais traduit.
     $md .= "## Instructions for Claude Code\n\n";
     $md .= "Preferably use the `/coquille-revue:apply-review` command in Claude Code. Otherwise, paste this whole file into Claude Code.\n\n";
     foreach (coquille_revue_claude_code_rules() as $i => $rule) {
@@ -1609,7 +1619,7 @@ function coquille_revue_markdown_head($status, $count) {
     $md .= "\n";
 
     if ($count === 0) {
-        return $md . "---\n\n_" . coquille_revue_markdown_line(__('No annotations with this status.', 'coquille-revue')) . "_\n";
+        return $md . "---\n\n_No annotations with this status._\n";
     }
 
     // Tout ce qui vient des visiteurs est enfermé dans un bloc de code :
@@ -1623,7 +1633,7 @@ function coquille_revue_markdown_row($r) {
     // Les lignes d'une valeur sont décalées de deux espaces : une ligne écrite par le visiteur
     // ne peut pas imiter un champ (url:, author:, suggestion:…).
     $value = function ($v) {
-        $v = (string) $v;
+        $v = coquille_revue_visible_text($v);
         $v = preg_replace('/\R/u', "\n", $v) ?? strtr($v, ["\r\n" => "\n", "\r" => "\n"]);
         return str_replace("\n", "\n  ", trim($v));
     };
@@ -1648,9 +1658,7 @@ function coquille_revue_markdown_row($r) {
 }
 
 function coquille_revue_markdown_footer() {
-    /* translators: 1: plugin name, 2: author name, linked to the author's website */
-    $credit = sprintf(__('%1$s plugin · by %2$s', 'coquille-revue'), 'Coquille Revue', COQUILLE_REVUE_AUTHOR);
-    return "\n---\n\n_" . coquille_revue_markdown_line($credit) . ' — ' . COQUILLE_REVUE_AUTHOR_URL . "_\n";
+    return "\n---\n\n_Coquille Revue plugin · by " . COQUILLE_REVUE_AUTHOR . ' — ' . COQUILLE_REVUE_AUTHOR_URL . "_\n";
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
