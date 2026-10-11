@@ -3,6 +3,9 @@
 // that gives a REST token to logged-in users only and can never close its script tag.
 class Test_Coquille_Revue_Assets extends Coquille_Revue_Test_Case {
 
+    // Data block of the configuration, whatever the order of its attributes (WordPress 7 writes id first).
+    const CONFIG_BLOCK = '~<script(?=[^>]*\bid="coquille-revue-config")(?=[^>]*\btype="application/json")[^>]*>(.*?)</script>~s';
+
     public function tear_down() {
         remove_all_filters('coquille_revue_load_overlay');
         remove_all_filters('gettext');
@@ -20,9 +23,17 @@ class Test_Coquille_Revue_Assets extends Coquille_Revue_Test_Case {
         return wp_script_is('coquille-revue-overlay', 'enqueued') && wp_style_is('coquille-revue-overlay', 'enqueued');
     }
 
+    private function render() {
+        ob_start();
+        coquille_revue_render_overlay();
+        return ob_get_clean();
+    }
+
+    // Configuration printed in the JSON data block, never in an inline script that browsers would run.
     private function front_config() {
-        $js = implode('', (array) wp_scripts()->get_data('coquille-revue-overlay', 'before'));
-        $this->assertSame(1, preg_match('/window\.coquilleRevueConfig = (\{.*\});/s', $js, $m));
+        $this->assertEmpty(wp_scripts()->get_data('coquille-revue-overlay', 'before'), 'no inline JavaScript');
+        $html = $this->render();
+        $this->assertSame(1, preg_match(self::CONFIG_BLOCK, $html, $m));
         return json_decode($m[1], true);
     }
 
@@ -61,15 +72,21 @@ class Test_Coquille_Revue_Assets extends Coquille_Revue_Test_Case {
         $this->assertStringNotContainsString('<!--', $html);
     }
 
-    public function test_inline_configuration_cannot_open_or_close_a_script_tag() {
+    public function test_configuration_block_cannot_open_or_close_a_script_tag() {
         $this->set_public_mode();
-        add_filter('gettext', function ($translation, $text, $domain) {
-            return $domain === 'coquille-revue' ? '</script><script>alert(1)</script>' : $translation;
+        $evil = '</script><script>alert(1)</script><!-- \' " &amp;';
+        add_filter('gettext', function ($translation, $text, $domain) use ($evil) {
+            return $domain === 'coquille-revue' ? $evil : $translation;
         }, 10, 3);
         $this->assertTrue($this->enqueue_front(0));
-        $js = implode('', (array) wp_scripts()->get_data('coquille-revue-overlay', 'before'));
-        $this->assertStringNotContainsString('</script', $js);
-        $this->assertStringNotContainsString('<script', $js);
+        $html = $this->render();
+        $this->assertSame(1, preg_match(self::CONFIG_BLOCK, $html, $m));
+        foreach (['<', '>', '&', "'"] as $char) {
+            $this->assertStringNotContainsString($char, $m[1], 'escaped in the data: ' . $char);
+        }
+        $this->assertStringContainsString(chr(92) . 'u0022', $m[1], 'quotes inside the texts are escaped');
+        $this->assertSame($evil, json_decode($m[1], true)['i18n']['send'], 'the text itself is intact');
+        $this->assertStringNotContainsString('<script>alert(1)', $html);
     }
 
     public function test_admin_files_only_on_the_plugin_page() {

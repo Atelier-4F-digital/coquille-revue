@@ -336,22 +336,23 @@ function coquille_revue_type_labels() {
 
 add_action('wp_enqueue_scripts', function () {
     if (!coquille_revue_overlay_enabled()) return;
-    $assets    = plugin_dir_url(__FILE__) . 'assets/';
-    $is_logged = is_user_logged_in();
+    $assets = plugin_dir_url(__FILE__) . 'assets/';
     wp_enqueue_style('coquille-revue-overlay', $assets . 'css/overlay.css', [], COQUILLE_REVUE_VERSION);
     wp_enqueue_script('coquille-revue-overlay', $assets . 'js/overlay.js', [], COQUILLE_REVUE_VERSION, ['in_footer' => true, 'strategy' => 'defer']);
+});
 
-    // Jeton REST seulement pour les personnes connectées : pour un anonyme il ne protège rien
-    // et, servi depuis un cache de page périmé, il ferait refuser l'envoi.
-    $config = [
+// Configuration lue par overlay.js. Jeton REST seulement pour les personnes connectées : pour un anonyme il ne protège
+// rien et, servi depuis un cache de page périmé, il ferait refuser l'envoi.
+function coquille_revue_overlay_config() {
+    $is_logged = is_user_logged_in();
+    return [
         'restUrl'    => rest_url('coquille-revue/v1/annotation'),
         'nonce'      => $is_logged ? wp_create_nonce('wp_rest') : '',
         'shortcut'   => $is_logged, // Alt+Maj+C : jamais pour les visiteurs anonymes
         'maxLengths' => COQUILLE_REVUE_MAX_LENGTHS + ['originalText' => COQUILLE_REVUE_MAX_TEXT_LENGTH, 'suggestion' => COQUILLE_REVUE_MAX_TEXT_LENGTH],
         'i18n'       => coquille_revue_overlay_strings(),
     ];
-    wp_add_inline_script('coquille-revue-overlay', 'window.coquilleRevueConfig = ' . wp_json_encode($config, JSON_HEX_TAG | JSON_UNESCAPED_UNICODE) . ';', 'before');
-});
+}
 
 // Priorité 10 : le HTML passe avant les scripts du pied de page (priorité 20). Rien n'est imprimé si le script
 // n'a pas été chargé : une seule condition d'affichage, celle de coquille_revue_overlay_enabled().
@@ -380,6 +381,13 @@ function coquille_revue_render_overlay() {
         _n('The IP address is kept for %d day to fight spam.', 'The IP address is kept for %d days to fight spam.', COQUILLE_REVUE_IP_RETENTION_DAYS, 'coquille-revue'),
         COQUILLE_REVUE_IP_RETENTION_DAYS
     ) . ' ' . __('Suggestions may be processed with an AI assistant.', 'coquille-revue');
+
+    // Configuration dans un bloc de données JSON, que le navigateur n'exécute jamais : elle fonctionne sous une CSP stricte
+    // sans jeton. Les signes < > & ' " sont échappés (<…) : une traduction ne peut ni fermer le bloc ni en ouvrir un.
+    wp_print_inline_script_tag(
+        wp_json_encode(coquille_revue_overlay_config(), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_UNICODE),
+        ['type' => 'application/json', 'id' => 'coquille-revue-config']
+    );
     // Icônes : SVG en ligne (pas d'emoji), décoratives, donc masquées aux lecteurs d'écran.
     ?>
     <div id="coquille-revue-root">

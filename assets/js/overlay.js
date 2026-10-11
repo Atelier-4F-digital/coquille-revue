@@ -1,10 +1,16 @@
-/* Coquille Revue — interface publique. Configuration et textes : window.coquilleRevueConfig, écrit par PHP. */
+/* Coquille Revue — interface publique. Configuration et textes : bloc JSON #coquille-revue-config, écrit par PHP. */
 (function () {
   'use strict';
 
-  // Fichier en cache plus récent ou plus ancien que la page : on ne fait rien plutôt que de casser la page.
-  const cfg = window.coquilleRevueConfig;
-  if (!cfg || !document.getElementById('coquille-fab')) return;
+  // Bloc de données jamais exécuté : il fonctionne sous une CSP stricte sans jeton. Fichier en cache plus récent ou plus
+  // ancien que la page (bloc absent ou illisible) : on ne fait rien plutôt que de casser la page.
+  let cfg = null;
+  try {
+    cfg = JSON.parse(document.getElementById('coquille-revue-config').textContent);
+  } catch (e) {
+    return;
+  }
+  if (!cfg || !cfg.i18n || !document.getElementById('coquille-fab')) return;
   const t = cfg.i18n;
 
   const PAGE_URL   = window.location.origin + window.location.pathname;
@@ -33,6 +39,7 @@
   const toast        = document.getElementById('coquille-toast');
   const zoneRect     = document.getElementById('coquille-zone-rect');
   const zoneHL       = document.getElementById('coquille-zone-highlight');
+  const typeButtons  = document.querySelectorAll('.coquille-type-btn');
 
   let reviewModeActive = false;
   let currentAnnotation = null;
@@ -285,7 +292,10 @@
     origText.classList.remove('coquille-zone-preview');
     const preview = text.slice(0, 150) + (text.length > 150 ? '…' : '');
     origText.textContent = fmt(t.quoted, preview);
-    if (!updating) textarea.value = '';
+    if (!updating) {
+      textarea.value = '';
+      setType('correction');
+    }
 
     highlightSelection(range);
     showBubble(range.getBoundingClientRect(), !touch);
@@ -328,6 +338,7 @@
       ? fmt(t.zonePreview, currentAnnotation.cssSelector, elText + (elText.length >= 120 ? '…' : ''))
       : currentAnnotation.cssSelector;
     textarea.value = '';
+    setType('correction');
 
     showBubble({ left: x, top: y, width: w, height: h, bottom: y + h }, true);
   }
@@ -425,14 +436,12 @@
     }, 600);
   });
 
-  // ── Type d'annotation ────────────────────────────────────────────────
-  const typeButtons = document.querySelectorAll('.coquille-type-btn');
-  typeButtons.forEach(btn => {
-    btn.addEventListener('click', () => {
-      typeButtons.forEach(b => b.setAttribute('aria-pressed', String(b === btn)));
-      activeType = btn.dataset.type;
-    });
-  });
+  // ── Type d'annotation : « Correction » à chaque nouvelle bulle ───────
+  function setType(type) {
+    activeType = type;
+    typeButtons.forEach(b => b.setAttribute('aria-pressed', String(b.dataset.type === type)));
+  }
+  typeButtons.forEach(btn => btn.addEventListener('click', () => setType(btn.dataset.type)));
 
   // ── Envoi ────────────────────────────────────────────────────────────
   let sending = false;

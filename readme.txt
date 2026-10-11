@@ -93,7 +93,7 @@ Yes. Pages served to visitors who are not logged in contain no security token, s
 
 = Does it work with a strict Content Security Policy? =
 
-Yes. On public pages, styles and scripts are files loaded by WordPress; only the small inline configuration script needs a nonce (`wp_inline_script_attributes` filter). Without that nonce, the pencil button is simply not shown. The admin page adds one small inline script (the confirmation before "Applied"), covered by the same filter.
+Yes. On public pages, styles and scripts are files loaded by WordPress, and the configuration is a JSON data block that browsers never run, so no inline script needs a nonce. If the script is blocked, the pencil button is simply not shown. The admin page adds one small inline script (the confirmation before "Applied"), which can get a nonce with the `wp_inline_script_attributes` filter.
 
 = Can I use a keyboard? =
 
