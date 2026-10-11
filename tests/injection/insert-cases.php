@@ -48,6 +48,7 @@ foreach ($items as $p) {
         'reviewer_ip'     => '203.0.113.9',
         'status'          => 'pending',
         'created_at'      => current_time('mysql', true),
+        'dates_utc'       => 1,
     ]);
     echo $wpdb->insert_id . ' (case ' . $p['id'] . '): ' . mb_substr(sanitize_text_field($p['original_text']), 0, 50) . "\n";
 }

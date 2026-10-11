@@ -17,7 +17,7 @@
 defined('ABSPATH') || exit;
 
 const COQUILLE_REVUE_VERSION    = '2.6.0';
-const COQUILLE_REVUE_DB_VERSION = '3';
+const COQUILLE_REVUE_DB_VERSION = '4';
 const COQUILLE_REVUE_AUTHOR_URL = 'https://atelier4fdigital.com';
 const COQUILLE_REVUE_AUTHOR     = 'Atelier 4F Digital';
 
@@ -114,7 +114,8 @@ function coquille_revue_table() {
 }
 
 // Dates enregistrées en UTC (created_at, applied_at), affichées et exportées à l'heure du site, traduites.
-// Les annotations antérieures à la version 2.6.0 ont été datées à l'heure du serveur MySQL.
+// Les annotations antérieures à la version 2.6.0, datées à l'heure du serveur MySQL, sont converties par la mise à jour
+// de la base en version 4.
 function coquille_revue_local_date($utc, $format = 'Y-m-d H:i:s') {
     $time = $utc ? strtotime($utc . ' UTC') : false;
     return $time ? (string) wp_date($format, $time) : '';
@@ -152,6 +153,7 @@ function coquille_revue_create_table() {
         status varchar(32) DEFAULT 'pending',
         created_at datetime DEFAULT CURRENT_TIMESTAMP,
         applied_at datetime DEFAULT NULL,
+        dates_utc tinyint(1) NOT NULL DEFAULT '0',
         PRIMARY KEY  (id),
         KEY blog_status (blog_id,status)
     ) {$charset};";
@@ -167,8 +169,11 @@ function coquille_revue_maybe_upgrade() {
     $installed = get_site_option('coquille_revue_db_version');
     if ($installed !== COQUILLE_REVUE_DB_VERSION) {
         coquille_revue_create_table();
-        if ($installed) {
+        if ($installed && version_compare($installed, '3', '<')) {
             coquille_revue_clean_legacy_rows();
+        }
+        if ($installed && version_compare($installed, '4', '<')) {
+            coquille_revue_upgrade_dates_and_names();
         }
         coquille_revue_assign_blog_ids();
         update_site_option('coquille_revue_db_version', COQUILLE_REVUE_DB_VERSION);
@@ -219,6 +224,24 @@ function coquille_revue_clean_legacy_rows() {
             $wpdb->update($table, $data, ['id' => (int) $row['id']]);
         }
     }
+}
+
+// Version 4 : created_at et applied_at des lignes antérieures à la 2.6.0, à l'heure du serveur MySQL, passent en UTC
+// avec le décalage de MySQL au moment de la mise à jour (une date d'hiver garde donc l'écart de l'heure d'été). Chaque
+// ligne est convertie et marquée (dates_utc = 1) dans la même requête : une mise à jour interrompue puis reprise ne
+// convertit jamais une ligne deux fois. Un visiteur sans nom n'est plus enregistré « Anonyme » (traduit à l'affichage).
+function coquille_revue_upgrade_dates_and_names() {
+    global $wpdb;
+    $table = coquille_revue_table();
+    // phpcs:ignore WordPress.DB.DirectDatabaseQuery -- offset of the MySQL clock, read once for a one-off migration.
+    $offset = (int) $wpdb->get_var('SELECT TIMESTAMPDIFF(SECOND, UTC_TIMESTAMP(), NOW())');
+    // phpcs:ignore WordPress.DB.DirectDatabaseQuery -- plugin table, one-off migration.
+    $wpdb->query($wpdb->prepare(
+        'UPDATE %i SET created_at = created_at - INTERVAL %d SECOND, applied_at = applied_at - INTERVAL %d SECOND, dates_utc = 1 WHERE dates_utc = 0',
+        $table, $offset, $offset
+    ));
+    // phpcs:ignore WordPress.DB.DirectDatabaseQuery -- plugin table, one-off migration.
+    $wpdb->query($wpdb->prepare("UPDATE %i SET author_name = '' WHERE author_id = 0 AND author_name = %s", $table, 'Anonyme'));
 }
 
 function coquille_revue_delete_site_rows($site) {
@@ -755,6 +778,7 @@ function coquille_revue_save_annotation(WP_REST_Request $request) {
         'reviewer_ip'     => $ip,
         'status'          => 'pending',
         'created_at'      => current_time('mysql', true),
+        'dates_utc'       => 1,
     ]);
 
     if (!$ok) {
@@ -788,6 +812,7 @@ function coquille_revue_get_rows($status, $opts = []) {
         if ($strip) {
             $row['reviewer_email'] = $row['reviewer_ip'] = $row['user_agent'] = null;
         }
+        unset($row['dates_utc']); // marqueur interne de la migration
     }
     unset($row);
     return $rows;
