@@ -30,7 +30,7 @@ All notable changes to Coquille Revue. Format based on [Keep a Changelog](https:
 - `_meta.plugin_version` key in the JSON export, read by the Claude Code plugin.
 - 11 English prompt injection cases in `tests/injection/cases.json` (28 cases in all).
 - Per-site “Thank-you email” setting (on by default) on the admin page, for the site's administrators only. When it is off, visitors are no longer asked for their email, the email is not stored, and the privacy texts are adapted. The `coquille_revue_notify_contributor` filter (`$enabled`, `$row`) decides annotation by annotation.
-- Admin page: 50 annotations per page with pagination, an “Alerts” column (the same alerts as in the exports for Claude Code), full original text and suggestion on hover, confirmation before “Applied” when a thank-you email is about to be sent.
+- Admin page: 50 annotations per page with pagination, alerts under each suggestion (the same alerts as in the exports for Claude Code), full original text and suggestion on hover, confirmation before “Applied” when a thank-you email is about to be sent.
 - Per-site “Credit” setting (off by default), for the site's administrators only. Both site settings (thank-you email and credit) are saved by a single form.
 - `coquille_revue_load_overlay` filter (boolean): return `false` to keep the review interface off a page.
 - Uninstall: deleting the plugin from the Plugins screen removes the annotations table, the settings and the scheduled tasks, on every site of the network (`uninstall.php`). Deactivating keeps everything.
@@ -45,7 +45,6 @@ All notable changes to Coquille Revue. Format based on [Keep a Changelog](https:
 
 ### Changed
 
-- Dates: `created_at` and `applied_at` are stored in UTC, and shown in the site time zone on the admin page, in the exports, in the thank-you email and in the personal data export. `created_at` came from the clock of the MySQL server and `applied_at` from the site time zone, so an annotation could look applied before it was created, and every date was shifted when MySQL and WordPress use different time zones. Annotations created before 2.6.0 keep the time of the MySQL server (nothing changes when it runs in UTC, as on most hosts).
 - The thank-you email and the digest email to the administrator are sent in the site language, whatever the language of the person whose action triggers them.
 - Admin page: status, type and mode labels are translated (the stored values do not change), dates use a translatable format and numbers the number format of the language. Alerts are shown with translated labels.
 - `wp coquille-revue locate` gives the status of each post where the text is found (a draft or a private post is not what visitors saw). When the text appears several times at one location, `apply --all --dry-run` shows an excerpt of each occurrence (`each_occurrence`), so that the user sees every place before replacing them all. `apply` no longer needs the PHP mbstring extension to build its report.
@@ -60,6 +59,13 @@ All notable changes to Coquille Revue. Format based on [Keep a Changelog](https:
 - Admin page: the confirmation before “Applied” uses a `data-coquille-confirm` attribute and a small script loaded by WordPress, instead of an `onclick` attribute. Status links of a page opened before the update no longer work (“The link you followed has expired”): reload the page.
 - Plugin header in English, following the WordPress.org rules (short description, `Requires at least`, `Domain Path`).
 - Alerts: the code points (U+XXXX) of invisible characters and mixed alphabets are computed without the PHP mbstring extension, which WordPress does not require.
+
+### Fixed
+
+- Dates: `created_at` and `applied_at` are stored in UTC, and shown in the site time zone on the admin page, in the exports, in the thank-you email and in the personal data export. `created_at` came from the clock of the MySQL server and `applied_at` from the site time zone, so an annotation could look applied before it was created, and every date was shifted when MySQL and WordPress use different time zones. Annotations created before 2.6.0 keep the time of the MySQL server (nothing changes when it runs in UTC, as on most hosts).
+- Admin page: the page, original text and suggestion columns were a dozen pixels wide at 1,280 px. The alerts are now shown under the suggestion and the mode next to the type, instead of two columns of their own, the short columns are narrower, and when the screen is too narrow the table scrolls horizontally instead of squeezing these three columns.
+- Admin page: after an action, its message (“Status updated.”, “Settings saved.”) no longer comes back on every change of page; a negative page number (`paged=-5`) shows the first page instead of the last one.
+- Admin page and CSV export: an area without text shows “(area without text)” in the language of the screen instead of the stored marker. The stored value, `(zone without text)`, does not change and stays in the exports for Claude Code.
 
 ### Security
 

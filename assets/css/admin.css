@@ -123,30 +123,37 @@
   color: #aaa;
 }
 
-/* Tableau */
+/* Tableau : largeurs fixes pour les colonnes courtes ; Page, Texte d'origine et Suggestion se partagent le reste.
+   Quand la place manque, le tableau défile horizontalement au lieu d'écraser ces trois colonnes. */
+.coquille-revue-admin .coquille-revue-table-wrap {
+  overflow-x: auto;
+}
+.coquille-revue-admin .coquille-revue-table {
+  min-width: 1050px;
+}
+.coquille-revue-admin .coquille-revue-table td {
+  overflow-wrap: anywhere;
+}
 .coquille-revue-admin .coquille-col-id {
-  width: 40px;
+  width: 36px;
 }
-.coquille-revue-admin .coquille-col-alerts {
-  width: 130px;
-}
-.coquille-revue-admin .coquille-col-mode {
-  width: 70px;
+.coquille-revue-admin .coquille-col-page {
+  width: 10%;
 }
 .coquille-revue-admin .coquille-col-type {
-  width: 90px;
+  width: 86px;
 }
 .coquille-revue-admin .coquille-col-author {
-  width: 120px;
+  width: 100px;
 }
 .coquille-revue-admin .coquille-col-status {
-  width: 90px;
+  width: 76px;
 }
 .coquille-revue-admin .coquille-col-date {
-  width: 110px;
+  width: 80px;
 }
 .coquille-revue-admin .coquille-col-actions {
-  width: 230px;
+  width: 130px;
 }
 .coquille-revue-admin .coquille-revue-table code {
   font-size: 11px;
@@ -162,8 +169,11 @@
 .coquille-revue-admin .coquille-revue-suggestion {
   color: #155724;
 }
+/* Alertes, sous la suggestion */
 .coquille-revue-admin .coquille-revue-alerts {
-  display: inline-block;
+  display: block;
+  width: fit-content;
+  margin-top: 6px;
   background: #fef2f2;
   color: #991b1b;
   border: 1px solid #fecaca;

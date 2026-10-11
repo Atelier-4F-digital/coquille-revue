@@ -1039,7 +1039,7 @@ function coquille_revue_query_choice($name, $allowed, $default) {
 }
 function coquille_revue_query_page($name) {
     // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- read-only page number; action handlers check their nonce first.
-    return isset($_GET[$name]) && is_string($_GET[$name]) ? max(1, absint(wp_unslash($_GET[$name]))) : 1;
+    return isset($_GET[$name]) && is_string($_GET[$name]) ? max(1, intval(wp_unslash($_GET[$name]))) : 1; // -5 → page 1
 }
 
 function coquille_revue_handle_change_status() {
@@ -1148,12 +1148,12 @@ function coquille_revue_handle_export() {
                 'ID', 'URL', __('Page', 'coquille-revue'), __('Mode', 'coquille-revue'), __('Type', 'coquille-revue'), __('Original text', 'coquille-revue'),
                 _x('Suggestion', 'proposed text', 'coquille-revue'), 'XPath', __('Author', 'coquille-revue'), 'IP', __('Status', 'coquille-revue'), __('Date', 'coquille-revue'),
             ]);
-            foreach (coquille_revue_row_batches($status, true) as $rows) { // e-mail et IP : seulement dans le CSV, pour un administrateur
+            foreach (coquille_revue_row_batches($status, true) as $rows) { // IP : seulement dans le CSV, pour un administrateur (l'e-mail n'est jamais exporté)
                 foreach ($rows as $r) {
                     coquille_revue_csv_line($out, [
                         $r['id'], $r['url'], $r['page_title'],
                         $r['annotation_mode'] ?? 'text', $r['type'],
-                        $r['original_text'], $r['suggestion'], $r['xpath'],
+                        coquille_revue_original_label($r), $r['suggestion'], $r['xpath'],
                         coquille_revue_author_label($r), $r['reviewer_ip'] ?? '',
                         $r['status'], coquille_revue_local_date($r['created_at']),
                     ]);
@@ -1371,6 +1371,17 @@ function coquille_revue_output_json($status) {
 // Provenance de l'annotation, en code fixe : un nom d'auteur anonyme n'est jamais vérifié.
 function coquille_revue_annotation_source($row) {
     return ((int) ($row['author_id'] ?? 0)) > 0 ? 'logged_in_user' : 'anonymous_unverified';
+}
+
+// Texte d'origine pour l'affichage (page d'admin, CSV) : une zone sans texte est enregistrée avec un marqueur fixe,
+// « (zone without text) » (« (zone sans texte direct) » en 2.5.0), remplacé par un libellé traduit. Les exports pour
+// Claude Code gardent la valeur enregistrée.
+function coquille_revue_original_label($row) {
+    $text = (string) ($row['original_text'] ?? '');
+    if (($row['annotation_mode'] ?? '') === 'zone' && in_array($text, ['(zone without text)', '(zone sans texte direct)'], true)) {
+        return __('(area without text)', 'coquille-revue');
+    }
+    return $text;
 }
 
 // Nom de l'auteur pour l'affichage (page d'admin, CSV) : un visiteur sans nom est enregistré avec un nom vide.
@@ -2199,8 +2210,12 @@ function coquille_revue_admin_page() {
         esc_html(add_query_arg('status', $filter, rest_url('coquille-revue/v1/annotations')))
     );
 
+    // paginate_links() recopie dans chaque lien les paramètres de l'adresse courante : on retire le message d'action,
+    // qui sinon réapparaîtrait à chaque changement de page.
     $pagination = '';
+    $no_message = fn($link) => remove_query_arg('coquille_revue_msg', $link);
     if ($pages > 1) {
+        add_filter('paginate_links', $no_message);
         $pagination = sprintf(
             '<div class="tablenav"><div class="tablenav-pages"><span class="displaying-num">%s</span> <span class="pagination-links">%s</span></div></div>',
             /* translators: %s: number of annotations */
@@ -2212,20 +2227,20 @@ function coquille_revue_admin_page() {
                 'total'   => $pages,
             ])
         );
+        remove_filter('paginate_links', $no_message);
     }
 
     if (empty($rows)) {
         echo '<p>' . esc_html__('No annotations with this status.', 'coquille-revue') . '</p>';
     } else {
         echo wp_kses_post($pagination);
-        echo '<table class="wp-list-table widefat fixed striped coquille-revue-table"><thead><tr>';
+        // Sur un écran étroit, le tableau défile horizontalement au lieu d'écraser les colonnes de texte.
+        echo '<div class="coquille-revue-table-wrap"><table class="wp-list-table widefat fixed striped coquille-revue-table"><thead><tr>';
         $columns = [
             'id'         => __('ID', 'coquille-revue'),
             'page'       => __('Page', 'coquille-revue'),
             'original'   => __('Original text', 'coquille-revue'),
             'suggestion' => _x('Suggestion', 'proposed text', 'coquille-revue'),
-            'alerts'     => __('Alerts', 'coquille-revue'),
-            'mode'       => __('Mode', 'coquille-revue'),
             'type'       => __('Type', 'coquille-revue'),
             'author'     => __('Author', 'coquille-revue'),
             'status'     => __('Status', 'coquille-revue'),
@@ -2249,19 +2264,29 @@ function coquille_revue_admin_page() {
                 esc_attr($row['url']),
                 esc_html(mb_substr($row['page_title'] ?: $row['url'], 0, 35))
             );
-            printf('<td title="%s"><code>%s</code></td>', esc_attr($row['original_text']), esc_html($cut($row['original_text'], 70)));
-            printf('<td class="coquille-revue-suggestion" title="%s">%s</td>', esc_attr($row['suggestion']), esc_html($cut($row['suggestion'], 70)));
-            if ($alerts) {
-                printf('<td><span class="coquille-revue-alerts">%s</span></td>', esc_html(implode(', ', $alerts)));
+            $original = coquille_revue_original_label($row);
+            if ($original !== (string) $row['original_text']) {
+                printf('<td><span class="coquille-revue-muted">%s</span></td>', esc_html($original));
             } else {
-                echo '<td><span class="coquille-revue-muted">—</span></td>';
+                printf('<td title="%s"><code>%s</code></td>', esc_attr($original), esc_html($cut($original, 70)));
             }
+            // Alertes sous la suggestion, là où on la lit avant de cliquer sur « Appliqué » (pas de colonne à part, qui
+            // prendrait la place des textes à relire).
+            printf('<td class="coquille-revue-suggestion" title="%s">%s', esc_attr($row['suggestion']), esc_html($cut($row['suggestion'], 70)));
+            if ($alerts) {
+                printf(
+                    '<span class="coquille-revue-alerts"><span class="screen-reader-text">%s </span>%s</span>',
+                    esc_html__('Alerts:', 'coquille-revue'),
+                    esc_html(implode(', ', $alerts))
+                );
+            }
+            echo '</td>';
             printf(
-                '<td><span class="coquille-pill coquille-pill--%s">%s</span></td>',
+                '<td><em>%s</em> <span class="coquille-pill coquille-pill--%s">%s</span></td>',
+                esc_html($types[$row['type']] ?? $row['type']),
                 esc_attr($mode),
                 $mode === 'zone' ? esc_html_x('area', 'annotation mode', 'coquille-revue') : esc_html_x('text', 'annotation mode', 'coquille-revue')
             );
-            printf('<td><em>%s</em></td>', esc_html($types[$row['type']] ?? $row['type']));
             echo '<td>' . esc_html(coquille_revue_author_label($row));
             if ((int) $row['author_id'] === 0) {
                 echo ' <em class="coquille-revue-muted">(' . esc_html__('not logged in', 'coquille-revue') . ')</em>';
@@ -2277,7 +2302,7 @@ function coquille_revue_admin_page() {
             echo '</td></tr>';
         }
 
-        echo '</tbody></table>';
+        echo '</tbody></table></div>';
         echo wp_kses_post($pagination);
     }
 

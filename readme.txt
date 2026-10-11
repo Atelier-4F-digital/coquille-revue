@@ -24,7 +24,7 @@ A pencil button floats on every page. A reviewer turns on review mode, selects s
 = Processing annotations =
 
 * Admin page with one tab per status (pending, in progress, applied, rejected, archived), 50 annotations per page, and one-click status changes.
-* An **Alerts** column flags annotations that need a careful look before anything is applied: web addresses, code or commands, invisible characters, mixed alphabets inside a word, and wording that gives instructions or claims authority. Alerts are computed by simple rules inside WordPress, without any AI.
+* **Alerts**, shown under each suggestion, flag annotations that need a careful look before anything is applied: web addresses, code or commands, invisible characters, mixed alphabets inside a word, and wording that gives instructions or claims authority. Alerts are computed by simple rules inside WordPress, without any AI.
 * Exports of the current tab as CSV (spreadsheet), JSON or Markdown.
 * Optional thank-you email (per site, on by default): when an annotation is marked as applied, its author receives a short generic message with the site name, the date and a link to the home page, never the text they typed. At most one email per address per day and 20 per site per day.
 * A digest email tells the site administrator about new annotations, at most once every 15 minutes.
@@ -130,7 +130,7 @@ Other changes:
 
 * Translation-ready, with a complete French translation. The thank-you and digest emails are sent in the site language.
 * Per-site settings for the thank-you email (on by default) and the public credit (off by default).
-* Admin page: pagination, Alerts column, confirmation before a status change that sends a thank-you email.
+* Admin page: pagination, alerts under each suggestion, confirmation before a status change that sends a thank-you email.
 * Styles and scripts are files loaded by WordPress, only where review mode is available.
 * Accessible review interface and full touch-screen support.
 * Security: hourly limit per IP address, safer exports, wider detection of links and instructions (French and English).
