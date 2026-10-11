@@ -793,11 +793,21 @@ function coquille_revue_count_by_status() {
     return $counts;
 }
 
+// Dates à l'heure du site, comme les exports, et en UTC dans created_at_gmt et applied_at_gmt (comme date et date_gmt
+// dans l'API de WordPress).
 function coquille_revue_list_annotations(WP_REST_Request $request) {
     $status   = $request->get_param('status');
     $per_page = (int) $request->get_param('per_page');
     $total    = coquille_revue_count_by_status()[$status];
-    $response = new WP_REST_Response(coquille_revue_get_rows($status, ['limit' => $per_page, 'offset' => ((int) $request->get_param('page') - 1) * $per_page]), 200);
+    $rows     = coquille_revue_get_rows($status, ['limit' => $per_page, 'offset' => ((int) $request->get_param('page') - 1) * $per_page]);
+    foreach ($rows as &$row) {
+        foreach (['created_at', 'applied_at'] as $date) {
+            $row[$date . '_gmt'] = $row[$date];
+            $row[$date]          = $row[$date] ? coquille_revue_local_date($row[$date]) : null;
+        }
+    }
+    unset($row);
+    $response = new WP_REST_Response($rows, 200);
     $response->header('X-WP-Total', (string) $total);
     $response->header('X-WP-TotalPages', (string) ceil($total / $per_page));
     return $response;

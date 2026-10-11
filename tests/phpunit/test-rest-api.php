@@ -258,6 +258,26 @@ class Test_Coquille_Revue_Rest_Api extends Coquille_Revue_Test_Case {
         $this->assertSame(400, rest_do_request($request)->get_status());
     }
 
+    public function test_listing_gives_dates_in_the_site_time_zone_and_in_utc() {
+        update_option('timezone_string', 'Asia/Tokyo');
+        $id = $this->insert_annotation(['created_at' => '2026-10-11 20:22:18', 'applied_at' => '2026-10-11 21:00:00', 'status' => 'applied']);
+        $this->insert_annotation(['created_at' => '2026-10-11 20:22:18']);
+        wp_set_current_user(self::factory()->user->create(['role' => 'editor']));
+
+        $request = new WP_REST_Request('GET', '/coquille-revue/v1/annotations');
+        $request->set_query_params(['status' => 'applied']);
+        $row = rest_do_request($request)->get_data()[0];
+        $this->assertSame((string) $id, $row['id']);
+        $this->assertSame(['2026-10-12 05:22:18', '2026-10-11 20:22:18'], [$row['created_at'], $row['created_at_gmt']]);
+        $this->assertSame(['2026-10-12 06:00:00', '2026-10-11 21:00:00'], [$row['applied_at'], $row['applied_at_gmt']]);
+        // Same local time as the JSON export.
+        $this->assertSame(coquille_revue_json_row($this->get_annotation($id))['created_at'], $row['created_at']);
+
+        $pending = $this->rest('GET', '/annotations')->get_data()[0];
+        $this->assertNull($pending['applied_at']);
+        $this->assertNull($pending['applied_at_gmt']);
+    }
+
     public function test_status_change_validates_its_parameter() {
         $id = $this->insert_annotation();
         wp_set_current_user(self::factory()->user->create(['role' => 'editor']));

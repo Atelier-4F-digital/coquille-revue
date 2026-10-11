@@ -93,7 +93,7 @@ Found a vulnerability? Please report it privately: see [SECURITY.md](SECURITY.md
 
 - **Keyboard shortcut**: <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>C</kbd> (<kbd>Option</kbd>+<kbd>Shift</kbd>+<kbd>C</kbd> on Mac) turns review mode on and off, for logged-in users. With the keyboard alone: in review mode, select the text (caret browsing, <kbd>F7</kbd>), then press <kbd>Enter</kbd>.
 - **Caching and optimization**: purge the page cache after an update. If a tool delays or combines scripts, exclude `coquille-revue`. With a strict Content Security Policy (CSP), only the small configuration script written in the page needs a nonce (`wp_inline_script_attributes` filter); without it, the pencil button is not shown.
-- **REST API** (`coquille-revue/v1`): `POST /annotation` to submit; `GET /annotations` (paginated: `per_page`, 100 at most, and `page`; totals in the `X-WP-Total` and `X-WP-TotalPages` headers) and `PATCH /annotation/{id}/status`, for the users who manage annotations.
+- **REST API** (`coquille-revue/v1`): `POST /annotation` to submit; `GET /annotations` (paginated: `per_page`, 100 at most, and `page`; totals in the `X-WP-Total` and `X-WP-TotalPages` headers; `created_at` and `applied_at` in the site time zone, and in UTC in `created_at_gmt` and `applied_at_gmt`) and `PATCH /annotation/{id}/status`, for the users who manage annotations.
 - **Uninstall**: deactivating the plugin keeps everything; deleting it from the **Plugins** screen removes the annotations table, the settings and the scheduled tasks, on every site of the network.
 
 ## Current limitations
