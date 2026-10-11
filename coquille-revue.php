@@ -900,18 +900,18 @@ function coquille_revue_set_status($id, $status) {
 
     // La date d'application n'est posée qu'une fois : sur un double clic ou deux appels simultanés,
     // une seule requête modifie la ligne, et elle seule envoie le remerciement.
-    $notified = false;
+    $thanks = 'none';
     // phpcs:ignore WordPress.DB.DirectDatabaseQuery -- plugin table, atomic update that guards the thank-you e-mail.
     if ($status === 'applied' && $wpdb->query($wpdb->prepare(
         'UPDATE %i SET status = %s, applied_at = %s WHERE id = %d AND blog_id = %d AND applied_at IS NULL',
         $table, $status, current_time('mysql', true), $id, $blog
     ))) {
-        $notified = coquille_revue_notify_contributor($row);
+        $thanks = coquille_revue_notify_contributor($row);
     } else {
         // phpcs:ignore WordPress.DB.DirectDatabaseQuery -- plugin table.
         $wpdb->update($table, ['status' => $status], ['id' => (int) $id, 'blog_id' => $blog]);
     }
-    return ['notified' => $notified];
+    return ['notified' => $thanks === 'sent', 'thanks' => $thanks];
 }
 
 // Un remerciement partira-t-il au passage à « applied » ? Réglage du site, filtre et adresse valide
@@ -960,10 +960,11 @@ add_action('coquille_revue_send_digest', function () {
     if ($switched) restore_previous_locale();
 });
 
-// Remerciement au contributeur quand son annotation passe à « applied ».
-// Renvoie true si wp_mail() a accepté l'envoi (succès SMTP non garanti — wp_mail() = best effort).
+// Remerciement au contributeur quand son annotation passe à « applied ». Renvoie 'sent' si wp_mail() a accepté l'envoi
+// (succès SMTP non garanti), 'none' s'il n'y a personne à remercier, 'limited' si un plafond d'envoi l'a retenu,
+// 'failed' si wp_mail() a échoué.
 function coquille_revue_notify_contributor($row) {
-    if (!coquille_revue_will_notify($row)) return false;
+    if (!coquille_revue_will_notify($row)) return 'none';
     $to = $row['reviewer_email'];
 
     // Plafonds : l'adresse d'un visiteur n'est pas vérifiée, elle ne doit pas servir à inonder quelqu'un.
@@ -972,7 +973,7 @@ function coquille_revue_notify_contributor($row) {
         ['coquille_revue_thx_site', COQUILLE_REVUE_THANKS_PER_SITE, DAY_IN_SECONDS],
     ];
     foreach ($limits as [$key, $limit, $window]) {
-        if (coquille_revue_rate_limited($key, $limit, $window)) return false;
+        if (coquille_revue_rate_limited($key, $limit, $window)) return 'limited';
     }
     foreach ($limits as [$key, , $window]) {
         coquille_revue_rate_count($key, $window);
@@ -1003,7 +1004,7 @@ function coquille_revue_notify_contributor($row) {
 
     $sent = (bool) wp_mail($mail['to'], $mail['subject'], $mail['message'], $mail['headers']);
     if ($switched) restore_previous_locale();
-    return $sent;
+    return $sent ? 'sent' : 'failed';
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1127,7 +1128,11 @@ function coquille_revue_handle_change_status() {
     $return = coquille_revue_query_choice('return_status', COQUILLE_REVUE_STATUSES, 'pending');
 
     $result = coquille_revue_set_status($id, $status);
-    $msg    = is_wp_error($result) ? ($result->get_error_code() === 'not_found' ? 'status_notfound' : 'status_invalid') : 'status_changed';
+    if (is_wp_error($result)) {
+        $msg = $result->get_error_code() === 'not_found' ? 'status_notfound' : 'status_invalid';
+    } else {
+        $msg = ['limited' => 'status_thanks_limited', 'failed' => 'status_thanks_failed'][$result['thanks']] ?? 'status_changed';
+    }
     wp_safe_redirect(add_query_arg(
         ['page' => 'coquille-revue', 'status' => $return, 'paged' => coquille_revue_query_page('return_paged'), 'coquille_revue_msg' => $msg],
         admin_url('admin.php')
@@ -1962,7 +1967,12 @@ if (defined('WP_CLI') && WP_CLI) {
             if (is_wp_error($result)) {
                 WP_CLI::error($result->get_error_code() === 'not_found' ? "Annotation {$id} not found on this site (on multisite, add --url)." : 'Invalid status.');
             }
-            WP_CLI::success("Annotation {$id}: {$args[1]}" . ($result['notified'] ? ' (thank-you email sent to the contributor).' : '.'));
+            $thanks = [
+                'sent'    => ' (thank-you email sent to the contributor).',
+                'limited' => ' (thank-you email not sent: daily limit reached).',
+                'failed'  => ' (thank-you email could not be sent).',
+            ];
+            WP_CLI::success("Annotation {$id}: {$args[1]}" . ($thanks[$result['thanks']] ?? '.'));
         }
 
         private static function row($id) {
@@ -2290,6 +2300,9 @@ function coquille_revue_admin_page() {
         /* translators: 1: name of the constant, 2: name of the configuration file */
         'mode_locked'       => ['error',   sprintf(esc_html__('The mode is locked by %1$s in %2$s. Remove the constant to switch it from this page.', 'coquille-revue'), '<code>COQUILLE_REVUE_REQUIRE_LOGIN</code>', '<code>wp-config.php</code>')],
         'status_changed'    => ['success', esc_html__('Status updated.', 'coquille-revue')],
+        /* translators: %d: maximum number of thank-you emails per day for the site */
+        'status_thanks_limited' => ['warning', sprintf(esc_html__('Status updated, but the thank-you email was not sent: the daily limit is reached (one email per address, %d per site).', 'coquille-revue'), (int) COQUILLE_REVUE_THANKS_PER_SITE)],
+        'status_thanks_failed'  => ['warning', esc_html__('Status updated, but the thank-you email could not be sent: check the email sending of the site.', 'coquille-revue')],
         'status_invalid'    => ['error',   esc_html__('Invalid status.', 'coquille-revue')],
         'status_notfound'   => ['error',   esc_html__('Annotation not found.', 'coquille-revue')],
         'settings_saved'    => ['success', esc_html__('Settings saved.', 'coquille-revue')],

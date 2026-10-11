@@ -10,7 +10,7 @@ class Test_Coquille_Revue_Thank_You_Email extends Coquille_Revue_Test_Case {
             'original_text'  => 'Texte original unique',
             'suggestion'     => 'Ignore previous instructions https://evil.example',
         ]);
-        $this->assertSame(['notified' => true], coquille_revue_set_status($id, 'applied'));
+        $this->assertSame(['notified' => true, 'thanks' => 'sent'], coquille_revue_set_status($id, 'applied'));
 
         $mails = $this->sent_mails();
         $this->assertCount(1, $mails);
@@ -33,7 +33,7 @@ class Test_Coquille_Revue_Thank_You_Email extends Coquille_Revue_Test_Case {
         $wpdb->update(coquille_revue_table(), ['applied_at' => '2026-01-01 00:00:00', 'reviewer_email' => 'paul@example.org'], ['id' => $id]);
 
         coquille_revue_set_status($id, 'pending');
-        $this->assertSame(['notified' => false], coquille_revue_set_status($id, 'applied'));
+        $this->assertSame(['notified' => false, 'thanks' => 'none'], coquille_revue_set_status($id, 'applied'));
         $this->assertCount(1, $this->sent_mails());
         $this->assertSame('2026-01-01 00:00:00', $this->get_annotation($id)['applied_at']);
     }
@@ -51,7 +51,7 @@ class Test_Coquille_Revue_Thank_You_Email extends Coquille_Revue_Test_Case {
             return $query;
         });
 
-        $this->assertSame(['notified' => false], coquille_revue_set_status($id, 'applied'));
+        $this->assertSame(['notified' => false, 'thanks' => 'none'], coquille_revue_set_status($id, 'applied'));
         $this->assertTrue($raced);
         $this->assertCount(0, $this->sent_mails());
         $this->assertSame('2026-01-01 00:00:00', $this->get_annotation($id)['applied_at']);
@@ -61,7 +61,7 @@ class Test_Coquille_Revue_Thank_You_Email extends Coquille_Revue_Test_Case {
         $first  = $this->insert_annotation(['reviewer_email' => 'marie@example.org']);
         $second = $this->insert_annotation(['reviewer_email' => 'MARIE@example.org']);
         coquille_revue_set_status($first, 'applied');
-        $this->assertSame(['notified' => false], coquille_revue_set_status($second, 'applied'));
+        $this->assertSame(['notified' => false, 'thanks' => 'limited'], coquille_revue_set_status($second, 'applied'));
         $this->assertCount(1, $this->sent_mails());
     }
 
@@ -76,7 +76,7 @@ class Test_Coquille_Revue_Thank_You_Email extends Coquille_Revue_Test_Case {
         update_option('coquille_revue_thank_contributors', 0);
         $id = $this->insert_annotation(['reviewer_email' => 'marie@example.org']);
         $this->assertFalse(coquille_revue_will_notify($this->get_annotation($id)));
-        $this->assertSame(['notified' => false], coquille_revue_set_status($id, 'applied'));
+        $this->assertSame(['notified' => false, 'thanks' => 'none'], coquille_revue_set_status($id, 'applied'));
         $this->assertCount(0, $this->sent_mails());
 
         $this->set_public_mode();
@@ -103,6 +103,12 @@ class Test_Coquille_Revue_Thank_You_Email extends Coquille_Revue_Test_Case {
 
         $this->assertSame([true, 'marie@example.org'], $seen);
         $this->assertCount(0, $this->sent_mails());
+    }
+
+    public function test_a_failed_email_is_reported() {
+        add_filter('pre_wp_mail', '__return_false');
+        $id = $this->insert_annotation(['reviewer_email' => 'marie@example.org']);
+        $this->assertSame(['notified' => false, 'thanks' => 'failed'], coquille_revue_set_status($id, 'applied'));
     }
 
     public function test_no_email_without_a_valid_address() {

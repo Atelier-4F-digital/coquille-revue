@@ -55,6 +55,30 @@ class Test_Coquille_Revue_Admin_Actions extends Coquille_Revue_Test_Case {
         $this->assertSame('rejected', $this->get_annotation($id)['status']);
     }
 
+    public function test_a_held_thank_you_email_gets_its_own_notice() {
+        wp_set_current_user(self::factory()->user->create(['role' => 'editor']));
+        $first  = $this->insert_annotation(['reviewer_email' => 'marie@example.org']);
+        $second = $this->insert_annotation(['reviewer_email' => 'marie@example.org']);
+        $apply  = function ($id) {
+            $_GET = ['id' => (string) $id, 'new_status' => 'applied'];
+            $this->nonce('coquille_revue_change_status');
+            return $this->run_handler('coquille_revue_handle_change_status')[1];
+        };
+        $this->assertStringContainsString('coquille_revue_msg=status_changed', $apply($first));
+        $this->assertStringContainsString('coquille_revue_msg=status_thanks_limited', $apply($second), 'one email per address and per day');
+        $this->assertSame('applied', $this->get_annotation($second)['status']);
+
+        add_filter('pre_wp_mail', '__return_false');
+        $this->assertStringContainsString('coquille_revue_msg=status_thanks_failed', $apply($this->insert_annotation(['reviewer_email' => 'paul@example.org'])));
+
+        $_GET = ['page' => 'coquille-revue', 'coquille_revue_msg' => 'status_thanks_limited'];
+        ob_start();
+        coquille_revue_admin_page();
+        $html = ob_get_clean();
+        $this->assertStringContainsString('notice-warning is-dismissible', $html);
+        $this->assertStringContainsString('the daily limit is reached (one email per address, ' . COQUILLE_REVUE_THANKS_PER_SITE . ' per site)', $html);
+    }
+
     public function test_change_status_of_another_site_is_not_found() {
         $id = $this->insert_annotation(['blog_id' => get_current_blog_id() + 100]);
         $_GET = ['id' => (string) $id, 'new_status' => 'rejected'];

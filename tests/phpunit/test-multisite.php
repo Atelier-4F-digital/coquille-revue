@@ -53,7 +53,7 @@ class Test_Coquille_Revue_Multisite extends Coquille_Revue_Test_Case {
 
         switch_to_blog($this->blog_id);
         $this->assertSame(1, coquille_revue_count_by_status()['pending']);
-        $this->assertSame(['notified' => true], coquille_revue_set_status($id, 'applied'));
+        $this->assertSame(['notified' => true, 'thanks' => 'sent'], coquille_revue_set_status($id, 'applied'));
         restore_current_blog();
         $this->assertCount(1, $this->sent_mails());
     }
