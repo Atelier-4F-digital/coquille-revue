@@ -26,9 +26,9 @@ A pencil button floats on every page. A reviewer turns on review mode, selects s
 * Admin page with one tab per status (pending, in progress, applied, rejected, archived), 50 annotations per page, and one-click status changes.
 * An **Alerts** column flags annotations that need a careful look before anything is applied: web addresses, code or commands, invisible characters, mixed alphabets inside a word, and wording that gives instructions or claims authority. Alerts are computed by simple rules inside WordPress, without any AI.
 * Exports of the current tab as CSV (spreadsheet), JSON or Markdown.
-* Optional thank-you e-mail (per site, on by default): when an annotation is marked as applied, its author receives a short generic message with the site name, the date and a link to the home page, never the text they typed. At most one e-mail per address per day and 20 per site per day.
-* A digest e-mail tells the site administrator about new annotations, at most once every 15 minutes.
-* WP-CLI commands `wp coquille-revue list|locate|apply|status`: `locate` finds where the original text is stored (posts, menus, options, custom fields, terms, theme and plugin files, translations); `apply` replaces it word for word in the database and refuses to add code, tags, links or shortcodes.
+* Optional thank-you email (per site, on by default): when an annotation is marked as applied, its author receives a short generic message with the site name, the date and a link to the home page, never the text they typed. At most one email per address per day and 20 per site per day.
+* A digest email tells the site administrator about new annotations, at most once every 15 minutes.
+* WP-CLI commands `wp coquille-revue list|locate|apply|status`: `locate` finds where the original text is stored (posts, menus, options, custom fields, terms, theme and plugin files, translations); `apply` replaces it word for word in the database and refuses to add code, tags, links or shortcodes. Help texts, messages and JSON keys are in English.
 
 = Apply corrections with Claude Code (optional) =
 
@@ -38,9 +38,13 @@ This plugin does not call any AI service or run any AI model. If you use Claude 
 
 Activate the plugin per site or network-wide. Each site only sees, exports and deletes its own annotations.
 
+= Languages =
+
+The interface is in English and French (a complete French translation is included), and ready for other translations: visitors see the site language, administrators their own language, and emails are sent in the site language. The rules given to Claude Code, the alert codes and the WP-CLI texts stay in English and are never translated, so that no translation can change what Claude Code reads.
+
 = For developers =
 
-* Filters: `coquille_revue_manage_capability` (who manages annotations, `edit_others_posts` by default), `coquille_revue_load_overlay` (return `false` to hide the review button on a page), `coquille_revue_notify_contributor` (send the thank-you e-mail or not, per annotation), `coquille_revue_contributor_email` (customize that e-mail), `coquille_revue_cli_writable_options` (options that `wp coquille-revue apply` may change).
+* Filters: `coquille_revue_manage_capability` (who manages annotations, `edit_others_posts` by default), `coquille_revue_load_overlay` (return `false` to hide the review button on a page), `coquille_revue_notify_contributor` (send the thank-you email or not, per annotation), `coquille_revue_contributor_email` (customize that email), `coquille_revue_cli_writable_options` (options that `wp coquille-revue apply` may change).
 * Constants for `wp-config.php`: `COQUILLE_REVUE_REQUIRE_LOGIN` (lock private or public mode), `COQUILLE_REVUE_TRUSTED_PROXY_HEADER` (header that holds the visitor IP address behind a trusted proxy, for example `HTTP_CF_CONNECTING_IP`).
 * REST API under `coquille-revue/v1`: `POST /annotation` (submit), `GET /annotations` and `PATCH /annotation/{id}/status` (for users who manage annotations).
 
@@ -51,23 +55,23 @@ Coquille Revue stores annotations in your own WordPress database. It sends nothi
 What is stored with each annotation:
 
 * the selected text, the remark, the page address (without query string or anchor), the position of the text in the page and the IP address of the submitter;
-* for a visitor: the name and the e-mail address, if they choose to give them (the e-mail field is only shown when the thank-you e-mail is on);
-* for a logged-in user: their display name, and the e-mail address of their account if they are a member of the site.
+* for a visitor: the name and the email address, if they choose to give them (the email field is only shown when the thank-you email is on);
+* for a logged-in user: their display name, and the email address of their account if they are a member of the site.
 
-Who can see it: the text, the remark and the name are visible to the users who manage annotations (editors and above by default). The IP address is visible to administrators only (admin page and CSV export). The e-mail address is shown nowhere: it is only used for the thank-you e-mail and by the WordPress personal data tools. Neither the e-mail nor the IP address is included in the REST API, the JSON and Markdown exports or the WP-CLI output.
+Who can see it: the text, the remark and the name are visible to the users who manage annotations (editors and above by default). The IP address is visible to administrators only (admin page and CSV export). The email address is shown nowhere: it is only used for the thank-you email and by the WordPress personal data tools. Neither the email nor the IP address is included in the REST API, the JSON and Markdown exports or the WP-CLI output.
 
-How long: IP addresses are deleted after 30 days. A visitor's name and e-mail address are deleted within a day of the annotation being processed (applied, rejected or archived), and after 6 months at the latest. Annotations of a deleted site are deleted.
+How long: IP addresses are deleted after 30 days. A visitor's name and email address are deleted within a day of the annotation being processed (applied, rejected or archived), and after 6 months at the latest. Annotations of a deleted site are deleted.
 
 The plugin suggests a privacy policy text (Settings > Privacy) and supports the WordPress personal data export and erasure tools.
 
-If you use the optional Claude Code companion, Claude Code reads the text, the remark and the author name of the annotations through WP-CLI on your computer and sends them to Anthropic as part of your conversation. E-mail and IP addresses are never part of what it reads.
+If you use the optional Claude Code companion, Claude Code reads the text, the remark and the author name of the annotations through WP-CLI on your computer and sends them to Anthropic as part of your conversation. Email and IP addresses are never part of what it reads.
 
 == Installation ==
 
 1. In your WordPress admin, go to Plugins > Add New, search for "Coquille Revue", then install and activate it (on multisite: activate it per site or network-wide).
 2. Open the Coquille Revue page in the admin menu. The plugin starts in private mode: logged-in users who can edit posts already see the pencil button on your pages.
 3. To let any visitor annotate, switch to public mode on the same page. Behind a proxy or a CDN such as Cloudflare, define `COQUILLE_REVUE_TRUSTED_PROXY_HEADER` in `wp-config.php` so that anti-spam limits use the real visitor IP address.
-4. Still on that page, an administrator can turn the thank-you e-mail off and the public credit on.
+4. Still on that page, an administrator can turn the thank-you email off and the public credit on.
 
 == Frequently Asked Questions ==
 
@@ -106,7 +110,7 @@ Deactivating keeps everything. Deleting the plugin from the Plugins screen remov
 3. The information popover of the pencil button.
 4. The admin page: annotations by status, alerts, status buttons and exports.
 5. On a phone: the remark bubble stays above the virtual keyboard.
-6. The thank-you e-mail received by a contributor.
+6. The thank-you email received by a contributor.
 
 == Changelog ==
 
@@ -114,16 +118,19 @@ Deactivating keeps everything. Deleting the plugin from the Plugins screen remov
 
 Breaking changes:
 
+* WP-CLI and exports use English names, with no alias for the 2.5.0 ones: `apply` options `--all`, `--alerts-reviewed`, `--text-file` and `--field`; JSON keys `_warning`, `alerts`, `found_on_page`; alert codes such as `web_address` or `instruction_or_authority`; source codes `logged_in_user` and `anonymous_unverified`. Update the Claude Code companion plugin to 2.6.0 at the same time: it stops on an older export.
+* The public credit is off by default.
 * Requires WordPress 6.2 or later.
 * The keyboard shortcut is now Alt+Shift+C (Option+Shift+C on Mac), for logged-in users only. Ctrl+Shift+R is no longer taken over.
 * REST API: every field is validated (type, length, allowed values); a wrong type now returns a 400 error. `PATCH /annotation/{id}/status` requires `status`, and `GET /annotations` is paginated (`per_page`, `page`).
 * WP-CLI: `apply --type=option` only changes text options of the site (`blogname`, `blogdescription`, `widget_*`, `theme_mods_*`, ACF `options_*`, extendable with a filter).
-* The thank-you e-mail is a generic message, sent with the WordPress default sender.
+* The thank-you email is a generic message, sent with the WordPress default sender.
 
 Other changes:
 
-* Per-site settings for the thank-you e-mail (on by default) and the public credit (off by default).
-* Admin page: pagination, Alerts column, confirmation before a status change that sends a thank-you e-mail.
+* Translation-ready, with a complete French translation. The thank-you and digest emails are sent in the site language.
+* Per-site settings for the thank-you email (on by default) and the public credit (off by default).
+* Admin page: pagination, Alerts column, confirmation before a status change that sends a thank-you email.
 * Styles and scripts are files loaded by WordPress, only where review mode is available.
 * Accessible review interface and full touch-screen support.
 * Security: hourly limit per IP address, safer exports, wider detection of links and instructions (French and English).
@@ -137,4 +144,4 @@ Other changes:
 
 = 2.6.0 =
 
-Requires WordPress 6.2. The keyboard shortcut becomes Alt+Shift+C and the REST API validates every field. Purge your page cache after updating.
+Requires WordPress 6.2. WP-CLI options and export keys are now in English: update the Claude Code companion plugin to 2.6.0 too. The keyboard shortcut becomes Alt+Shift+C and the REST API validates every field. Purge your page cache after updating.
