@@ -99,7 +99,8 @@ All notable changes to Coquille Revue. Format based on [Keep a Changelog](https:
   - the checks also read a decoded copy of the replacement text (`\uXXXX` sequences, HTML entities, `%XX`, full-width forms, spaces inside `javascript:`): in content stored as JSON (block attributes, page builders), these forms would become active HTML again;
   - `style=` attributes are refused like `on…=` ones;
   - a tag, an HTML comment, a link or a shortcode of the replacement text must appear verbatim in the original text: a link swapped for another one is refused, not only an extra one;
-  - a text that the checks cannot read is refused.
+  - an original or replacement text that the checks cannot read (invalid UTF-8, computation limit) is refused, with a message that says so;
+  - punctuation stuck to the end of an address (`www.example.fr !` corrected to `www.example.fr.`) is not part of the address: correcting it is no longer refused as an added link.
 - Personal data: the WordPress export and erasure tools also find the annotations of the account that holds the email address, even when the email is not stored with them (thank-you email off, account that is not a member of the site, email already deleted once the annotation was processed); the export shows the display name of the account.
 - Anti-spam: an IPv4 address written as IPv6 (`::ffff:a.b.c.d`, given by some dual-stack servers) keeps its own limit; all IPv4 visitors used to share one counter, so a single one of them could block everyone else.
 - REST API: each element name of the XPath is limited to 64 characters (a longer one is a sentence written with hyphens).

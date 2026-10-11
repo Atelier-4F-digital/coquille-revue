@@ -105,8 +105,32 @@ class Test_Coquille_Revue_Cli extends Coquille_Revue_Test_Case {
         file_put_contents($this->work . '/.coquille-revue/replacement.txt', "Bonjour le monde \xC3\x28");
         $result = $this->apply($this->insert_annotation(['original_text' => 'Bonjour le monde']), ['type' => 'post', 'ref' => (string) $post, 'text-file' => '.coquille-revue/replacement.txt']);
         $this->assertIsString($result);
-        $this->assertStringContainsString('refused', $result);
+        $this->assertStringContainsString('cannot be read by the checks', $result);
         $this->assertSame('Bonjour le monde', get_post($post)->post_content);
+    }
+
+    // An original text that the link check cannot read, with a clean replacement: the explicit refusal is the only
+    // barrier (no other check reads the original text).
+    public function test_unreadable_original_text_is_refused_explicitly() {
+        $check = new ReflectionMethod('Coquille_Revue_CLI', 'check_replacement');
+        $check->setAccessible(true);
+        try {
+            $check->invoke(null, "Bonjour le monde \xC3\x28", 'Bonjour le monde');
+            $this->fail('unreadable original text accepted');
+        } catch (Coquille_Revue_Test_CLI_Error $e) {
+            $this->assertStringContainsString('cannot be read by the checks', $e->getMessage());
+        }
+    }
+
+    public function test_punctuation_right_after_an_address_can_be_corrected() {
+        $post = self::factory()->post->create(['post_content' => 'Contact : www.atelier4f.fr ! Merci']);
+        $on   = ['type' => 'post', 'ref' => (string) $post, 'alerts-reviewed' => true];
+        $id   = $this->insert_annotation(['original_text' => 'Contact : www.atelier4f.fr !', 'suggestion' => 'Contact : www.atelier4f.fr.']);
+        $this->assertIsArray($this->apply($id, $on));
+        $this->assertSame('Contact : www.atelier4f.fr. Merci', get_post($post)->post_content);
+        // The address itself still cannot change.
+        $id = $this->insert_annotation(['original_text' => 'Contact : www.atelier4f.fr.', 'suggestion' => 'Contact : www.atelier4f.fr.ru.']);
+        $this->assertStringContainsString('adds a link', $this->apply($id, $on));
     }
 
     public function test_a_link_cannot_be_swapped_for_another_one() {

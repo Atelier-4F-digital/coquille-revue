@@ -1905,7 +1905,10 @@ if (defined('WP_CLI') && WP_CLI) {
         // Une correction remplace du texte par du texte : aucun code, et aucune balise, aucun lien ni shortcode qui ne soit
         // déjà, à l'identique, dans le texte d'origine (un lien remplacé par un autre est refusé). Les contrôles portent
         // aussi sur une copie décodée (\uXXXX, entités HTML, %XX, pleine chasse) : dans un contenu stocké en JSON (bloc,
-        // constructeur de page), ces formes redeviendraient du HTML actif. Un texte illisible est refusé.
+        // constructeur de page), ces formes redeviendraient du HTML actif. Un texte que les contrôles ne peuvent pas lire
+        // (UTF-8 invalide, limite de calcul) est refusé avec son propre message, à chaque contrôle.
+        private const UNREADABLE = 'The original text or the replacement text cannot be read by the checks (invalid UTF-8 or computation limit): refused.';
+
         private static function check_replacement($search, $replace) {
             $added = [
                 'adds HTML tags'   => '~<(?:!--|[!/?]?[a-z][a-z0-9-]*)~i',
@@ -1914,22 +1917,44 @@ if (defined('WP_CLI') && WP_CLI) {
             ];
             foreach ([[$search, $replace], [coquille_revue_normalize_text($search), coquille_revue_normalize_text($replace)]] as [$from, $to]) {
                 $flat = preg_replace('~\s+~u', '', $to);
-                if ($flat === null || preg_match('~<\?|\bon[a-z]+\s*=|\bstyle\s*=~i', $to) !== 0 || preg_match('~(?:java|vb)script:~i', $flat) !== 0) {
+                if ($flat === null) {
+                    WP_CLI::error(self::UNREADABLE);
+                }
+                if (self::matches('~<\?|\bon[a-z]+\s*=|\bstyle\s*=~i', $to) || self::matches('~(?:java|vb)script:~i', $flat)) {
                     WP_CLI::error('The replacement text contains code: refused.');
                 }
                 foreach ($added as $what => $pattern) {
-                    $new = self::added_matches($pattern, $from, $to);
-                    if ($new === null || $new) {
+                    $new = self::added_matches($pattern, $from, $to, $what === 'adds a link');
+                    if ($new === null) {
+                        WP_CLI::error(self::UNREADABLE);
+                    }
+                    if ($new) {
                         WP_CLI::error("The replacement text {$what}: refused.");
                     }
                 }
             }
         }
 
+        // true si le motif trouve le texte ; un texte illisible pour l'expression régulière est refusé.
+        private static function matches($pattern, $text) {
+            $result = preg_match($pattern, $text);
+            if ($result === false) {
+                WP_CLI::error(self::UNREADABLE);
+            }
+            return $result === 1;
+        }
+
         // Correspondances de $to qui ne sont pas, à l'identique et en même nombre, dans $from ; null si un texte est illisible.
-        private static function added_matches($pattern, $from, $to) {
+        // Pour les liens, la ponctuation collée à la fin ne compte pas : corriger « www.site.fr ! » en « www.site.fr. »
+        // ne change pas l'adresse.
+        private static function added_matches($pattern, $from, $to, $trim_punctuation = false) {
             if (preg_match_all($pattern, $from, $old) === false || preg_match_all($pattern, $to, $new) === false) {
                 return null;
+            }
+            if ($trim_punctuation) {
+                $trim   = fn($match) => preg_replace('~[.,;:!?)\]»"\'’…]+$~u', '', $match) ?? $match;
+                $old[0] = array_map($trim, $old[0]);
+                $new[0] = array_map($trim, $new[0]);
             }
             $left  = $old[0];
             $added = [];
