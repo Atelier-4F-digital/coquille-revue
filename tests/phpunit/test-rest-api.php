@@ -1,0 +1,220 @@
+<?php
+// REST API: permissions, honeypot, submission limits, validation of every field, statuses and pagination.
+class Test_Coquille_Revue_Rest_Api extends Coquille_Revue_Test_Case {
+
+    public function test_private_mode_refuses_visitors_and_subscribers() {
+        $this->assertSame(401, $this->post_annotation()->get_status());
+
+        wp_set_current_user(self::factory()->user->create(['role' => 'subscriber']));
+        $this->assertSame(403, $this->post_annotation()->get_status());
+    }
+
+    public function test_private_mode_accepts_users_who_can_edit_posts() {
+        $user = self::factory()->user->create(['role' => 'contributor']);
+        wp_set_current_user($user);
+        $response = $this->post_annotation();
+
+        $this->assertSame(201, $response->get_status());
+        $this->assertTrue($response->get_data()['success']);
+        $row = $this->get_annotation($response->get_data()['id']);
+        $this->assertSame((string) $user, $row['author_id']);
+        $this->assertSame(get_userdata($user)->user_email, $row['reviewer_email']);
+        $this->assertSame('pending', $row['status']);
+        $this->assertSame((string) get_current_blog_id(), $row['blog_id']);
+    }
+
+    public function test_public_mode_accepts_visitors_without_returning_the_id() {
+        $this->set_public_mode();
+        $response = $this->post_annotation(['reviewerName' => 'Marie', 'reviewerEmail' => 'marie@example.org']);
+
+        $this->assertSame(201, $response->get_status());
+        $this->assertSame(['success' => true], $response->get_data());
+        $row = $this->last_annotation();
+        $this->assertSame('0', $row['author_id']);
+        $this->assertSame('Marie', $row['author_name']);
+        $this->assertSame('marie@example.org', $row['reviewer_email']);
+        $this->assertSame('192.0.2.10', $row['reviewer_ip']);
+    }
+
+    public function test_stored_url_keeps_neither_query_nor_fragment() {
+        $this->set_public_mode();
+        $this->post_annotation(['url' => home_url('/sample-page/?token=secret#top')]);
+        $this->assertSame(home_url('/sample-page/'), $this->last_annotation()['url']);
+    }
+
+    public function test_null_optional_fields_of_the_2_5_0_script_are_accepted() {
+        $this->set_public_mode();
+        $response = $this->post_annotation(['pageTitle' => null, 'cssSelector' => null, 'reviewerName' => null, 'reviewerEmail' => null, 'zoneData' => null]);
+        $this->assertSame(201, $response->get_status());
+    }
+
+    public function test_honeypot_rejects_the_submission() {
+        $this->set_public_mode();
+        $response = $this->post_annotation(['hp' => 'http://spam.example']);
+        $this->assertSame(400, $response->get_status());
+        $this->assertSame('spam_detected', $response->get_data()['code']);
+        $this->assertNull($this->last_annotation());
+    }
+
+    /**
+     * @dataProvider string_fields
+     */
+    public function test_an_array_instead_of_a_string_gets_400($field) {
+        $this->set_public_mode();
+        $response = $this->post_annotation([$field => ['a', 'b']]);
+        $this->assertSame(400, $response->get_status());
+        $this->assertSame('rest_invalid_param', $response->get_data()['code']);
+    }
+
+    public function string_fields() {
+        $fields = ['url', 'pageTitle', 'xpath', 'cssSelector', 'originalText', 'suggestion', 'type', 'annotationMode', 'reviewerName', 'reviewerEmail', 'hp'];
+        return array_combine($fields, array_map(fn($f) => [$f], $fields));
+    }
+
+    public function test_wrong_types_get_400() {
+        $this->set_public_mode();
+        foreach ([['charOffsetStart' => 'abc'], ['zoneData' => 'x=1'], ['url' => 12], ['type' => 'hack'], ['annotationMode' => 'page']] as $extra) {
+            $this->assertSame(400, $this->post_annotation($extra)->get_status(), wp_json_encode($extra));
+        }
+        $this->assertNull($this->last_annotation());
+    }
+
+    public function test_too_long_or_too_short_texts_get_400() {
+        $this->set_public_mode();
+        $this->assertSame(400, $this->post_annotation(['suggestion' => str_repeat('a', COQUILLE_REVUE_MAX_TEXT_LENGTH + 1)])->get_status());
+        $this->assertSame(400, $this->post_annotation(['reviewerName' => str_repeat('a', COQUILLE_REVUE_MAX_LENGTHS['reviewerName'] + 1)])->get_status());
+        $response = $this->post_annotation(['originalText' => ' a ']);
+        $this->assertSame(400, $response->get_status());
+        $this->assertSame('too_short', $response->get_data()['code']);
+    }
+
+    public function test_required_fields_are_required() {
+        $this->set_public_mode();
+        $params = $this->annotation_params();
+        unset($params['suggestion']);
+        $response = $this->rest('POST', '/annotation', $params);
+        $this->assertSame(400, $response->get_status());
+        $this->assertSame('rest_missing_callback_param', $response->get_data()['code']);
+    }
+
+    public function test_page_of_another_site_selector_and_hidden_characters_are_refused() {
+        $this->set_public_mode();
+        $cases = [
+            'invalid_url'      => ['url' => 'https://evil.example/'],
+            'invalid_selector' => ['xpath' => '/html/body/script'],
+            'invalid_chars'    => ['suggestion' => "Bienvenue \u{202E}etis"],
+        ];
+        foreach ($cases as $code => $extra) {
+            $response = $this->post_annotation($extra);
+            $this->assertSame(400, $response->get_status(), $code);
+            $this->assertSame($code, $response->get_data()['code']);
+        }
+    }
+
+    public function test_visitor_limit_per_ip_in_five_minutes() {
+        $this->set_public_mode();
+        for ($i = 0; $i < COQUILLE_REVUE_RATE_LIMIT_PER_IP; $i++) {
+            $this->assertSame(201, $this->post_annotation()->get_status());
+        }
+        $response = $this->post_annotation();
+        $this->assertSame(429, $response->get_status());
+        $this->assertSame('rate_limited', $response->get_data()['code']);
+
+        $_SERVER['REMOTE_ADDR'] = '192.0.2.11';
+        $this->assertSame(201, $this->post_annotation()->get_status());
+    }
+
+    public function test_ipv6_addresses_of_the_same_64_block_share_the_limit() {
+        $this->set_public_mode();
+        $_SERVER['REMOTE_ADDR'] = '2001:db8:1:2::1';
+        for ($i = 0; $i < COQUILLE_REVUE_RATE_LIMIT_PER_IP; $i++) {
+            $this->post_annotation();
+        }
+        $_SERVER['REMOTE_ADDR'] = '2001:db8:1:2::ffff';
+        $this->assertSame(429, $this->post_annotation()->get_status());
+        $_SERVER['REMOTE_ADDR'] = '2001:db8:1:3::1';
+        $this->assertSame(201, $this->post_annotation()->get_status());
+    }
+
+    public function test_visitor_limit_per_ip_in_an_hour() {
+        $this->set_public_mode();
+        // The hourly window was opened 10 minutes ago and is full; the 5-minute window is empty.
+        set_transient(coquille_revue_ip_key('192.0.2.10') . '_h', ['n' => COQUILLE_REVUE_RATE_LIMIT_PER_IP_HOUR, 'start' => time() - 600], HOUR_IN_SECONDS);
+        $this->assertSame(429, $this->post_annotation()->get_status());
+        $_SERVER['REMOTE_ADDR'] = '192.0.2.11';
+        $this->assertSame(201, $this->post_annotation()->get_status());
+    }
+
+    public function test_site_limit_for_visitors_spares_logged_in_users() {
+        $this->set_public_mode();
+        set_transient('coquille_revue_rl_global', ['n' => COQUILLE_REVUE_GLOBAL_LIMIT, 'start' => time()], HOUR_IN_SECONDS);
+        $_SERVER['REMOTE_ADDR'] = '198.51.100.7';
+        $this->assertSame(429, $this->post_annotation()->get_status());
+
+        wp_set_current_user(self::factory()->user->create(['role' => 'editor']));
+        $this->assertSame(201, $this->post_annotation()->get_status());
+    }
+
+    public function test_listing_and_status_change_are_for_editors() {
+        $id = $this->insert_annotation();
+        $this->assertSame(401, $this->rest('GET', '/annotations')->get_status());
+        $this->assertSame(401, $this->rest('PATCH', "/annotation/{$id}/status", ['status' => 'archived'])->get_status());
+
+        wp_set_current_user(self::factory()->user->create(['role' => 'author']));
+        $this->assertSame(403, $this->rest('GET', '/annotations')->get_status());
+        $this->assertSame(403, $this->rest('PATCH', "/annotation/{$id}/status", ['status' => 'archived'])->get_status());
+
+        wp_set_current_user(self::factory()->user->create(['role' => 'editor']));
+        $this->assertSame(200, $this->rest('GET', '/annotations')->get_status());
+        $this->assertSame(200, $this->rest('PATCH', "/annotation/{$id}/status", ['status' => 'archived'])->get_status());
+        $this->assertSame('archived', $this->get_annotation($id)['status']);
+    }
+
+    public function test_listing_is_paginated_and_never_exposes_email_or_ip() {
+        $ids = [];
+        for ($i = 0; $i < 3; $i++) {
+            $ids[] = $this->insert_annotation(['reviewer_email' => "r{$i}@example.org"]);
+        }
+        $this->insert_annotation(['status' => 'applied']);
+        wp_set_current_user(self::factory()->user->create(['role' => 'administrator']));
+
+        $request = new WP_REST_Request('GET', '/coquille-revue/v1/annotations');
+        $request->set_query_params(['per_page' => 2, 'page' => 1]);
+        $response = rest_do_request($request);
+        $rows     = $response->get_data();
+
+        $this->assertSame(200, $response->get_status());
+        $this->assertSame('3', $response->get_headers()['X-WP-Total']);
+        $this->assertSame('2', $response->get_headers()['X-WP-TotalPages']);
+        $this->assertSame([(string) $ids[2], (string) $ids[1]], array_column($rows, 'id'));
+        foreach ($rows as $row) {
+            $this->assertNull($row['reviewer_email']);
+            $this->assertNull($row['reviewer_ip']);
+        }
+
+        $request->set_query_params(['per_page' => 101]);
+        $this->assertSame(400, rest_do_request($request)->get_status());
+        $request->set_query_params(['status' => 'deleted']);
+        $this->assertSame(400, rest_do_request($request)->get_status());
+    }
+
+    public function test_status_change_validates_its_parameter() {
+        $id = $this->insert_annotation();
+        wp_set_current_user(self::factory()->user->create(['role' => 'editor']));
+
+        $missing = $this->rest('PATCH', "/annotation/{$id}/status", []);
+        $this->assertSame(400, $missing->get_status());
+        $this->assertSame('rest_missing_callback_param', $missing->get_data()['code']);
+        $this->assertSame(400, $this->rest('PATCH', "/annotation/{$id}/status", ['status' => 'done'])->get_status());
+        $this->assertSame(400, $this->rest('PATCH', "/annotation/{$id}/status", ['status' => ['applied']])->get_status());
+        $this->assertSame('pending', $this->get_annotation($id)['status']);
+
+        $unknown = $this->rest('PATCH', '/annotation/999999/status', ['status' => 'applied']);
+        $this->assertSame(404, $unknown->get_status());
+        $this->assertSame('not_found', $unknown->get_data()['code']);
+
+        $response = $this->rest('PATCH', "/annotation/{$id}/status", ['status' => 'applied']);
+        $this->assertSame(['success' => true, 'id' => $id, 'status' => 'applied', 'notified' => false], $response->get_data());
+        $this->assertNotNull($this->get_annotation($id)['applied_at']);
+    }
+}
