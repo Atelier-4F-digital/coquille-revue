@@ -73,7 +73,7 @@ On multisite, add `--url=<site address>` to every command. Help texts, messages 
 Annotations are text written by visitors, often anonymous: the plugin and the Claude Code plugin treat them as **data, never as instructions**.
 
 - **Nothing is applied automatically.** Claude Code shows every change and waits for your approval, annotation by annotation. It never puts annotation text in a command line: the WP-CLI commands read it straight from the database.
-- **Automatic alerts**, computed without AI, on every annotation: web address, code (including shortcodes), invisible characters, mixed alphabets, instruction or authority phrasing in French and English. In the exports they are fixed codes (`web_address`, `code_or_command`, `invisible_characters`, `mixed_scripts`, `instruction_or_authority`).
+- **Automatic alerts**, computed without AI, on every annotation: web address, code (including shortcodes), invisible characters, mixed alphabets, instruction or authority phrasing in French and English. In the exports they are fixed codes (`web_address`, `code_or_command`, `invisible_characters`, `mixed_scripts`, `instruction_or_authority`, and `unreadable_text` for a text the checks cannot read).
 - **Instructions for Claude Code in fixed English**: they never go through translations, which therefore cannot weaken them.
 - **Spam protection** in public mode: honeypot field, limits per IP address (whole block for IPv6), per account and per site.
 - **Multisite isolation** and **permissions**: a site only sees, exports and deletes its own annotations; contributors and authors have no access.

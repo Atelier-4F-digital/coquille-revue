@@ -73,7 +73,7 @@ En multisite, ajoutez `--url=<adresse du sous-site>` à chaque commande. L'aide,
 Les annotations sont du texte écrit par des visiteurs, souvent anonymes : l'extension et le plugin Claude Code les traitent comme des **données, jamais comme des consignes**.
 
 - **Aucune application automatique.** Claude Code montre chaque changement et attend votre accord, annotation par annotation. Il ne place jamais le texte d'une annotation dans une ligne de commande : les commandes WP-CLI le lisent directement dans la base.
-- **Alertes automatiques**, calculées sans IA, sur chaque annotation : adresse web, code (dont shortcodes), caractères invisibles, alphabets mélangés, formules de consigne ou d'autorité en français et en anglais. Dans les exports, ce sont des codes fixes (`web_address`, `code_or_command`, `invisible_characters`, `mixed_scripts`, `instruction_or_authority`).
+- **Alertes automatiques**, calculées sans IA, sur chaque annotation : adresse web, code (dont shortcodes), caractères invisibles, alphabets mélangés, formules de consigne ou d'autorité en français et en anglais. Dans les exports, ce sont des codes fixes (`web_address`, `code_or_command`, `invisible_characters`, `mixed_scripts`, `instruction_or_authority`, et `unreadable_text` pour un texte que les contrôles ne peuvent pas lire).
 - **Consignes pour Claude Code en anglais fixe** : elles ne passent jamais par les traductions, qui ne peuvent donc pas les affaiblir.
 - **Anti-spam** en mode public : champ piège, limites par adresse IP (bloc entier en IPv6), par compte et par site.
 - **Cloisonnement multisite** et **droits** : un site ne voit, n'exporte et ne supprime que ses annotations ; les contributeurs et auteurs n'y ont pas accès.

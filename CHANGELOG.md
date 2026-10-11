@@ -69,6 +69,15 @@ All notable changes to Coquille Revue. Format based on [Keep a Changelog](https:
 - Admin page: a crafted URL parameter (`coquille_revue_msg[]=1`, `format[]=…`) no longer crashes the page; links opened in a new tab have `rel="noopener noreferrer"`.
 - Status change from the admin page: the security token is checked before any URL parameter is read.
 - CSV, JSON and Markdown exports and `wp coquille-revue list` read the database in batches of 500 and write as they go: memory stays stable whatever the number of annotations.
+- Alerts, wider detection:
+  - `invisible_characters` covers every format character (Unicode category Cf: the “Tag” characters U+E0000–U+E007F that hide a text an AI can read, U+061C, U+180E, U+2061–U+2064…), private use characters, Hangul fillers, the braille blank and variation selectors (a single U+FE0E or U+FE0F after an emoji is not flagged).
+  - `mixed_scripts` also covers lookalike letters from the Armenian, Cherokee, Coptic, Lisu and Canadian syllabics alphabets, and full-width Latin letters in a text without Chinese, Japanese or Korean characters.
+  - `code_or_command` and `web_address` also read a decoded copy of the text (`\uXXXX` sequences, HTML entities, `%XX`, full-width forms); `code_or_command` flags these encoded forms and `on…=` or `style=` attributes too.
+  - `instruction_or_authority` also matches “AI” (upper case only, so that the French “j'ai” does not), “go ahead”, “sans attendre” and “feu vert”, and is also searched in the CSS selector, the XPath and the path of the page address, read word by word.
+  - New `unreadable_text` alert: a text that the checks cannot read (invalid UTF-8, computation limit reached) is never shown as clean.
+  - The display name of an account that manages annotations (editors and above by default) is set by the site and no longer checked: an editor called “admin” no longer marks all their annotations.
+- Link detection runs in linear time: a text such as `a.a.a.a…` could take about a second per annotation without PCRE JIT, enough to stall the admin page and the exports.
+- Rule 7 for Claude Code (exports) names every field typed by the visitor: original text, suggestion, author, page title, URL, CSS selector and XPath.
 
 ## [2.5.0] — 2026-10-09 — first public release
 
