@@ -2133,7 +2133,7 @@ function coquille_revue_admin_page() {
             checked(coquille_revue_show_credit(), true, false),
             sprintf(
                 /* translators: 1: "Credit", in bold, 2: author name */
-                esc_html__('%1$s: show “Coquille Revue, by %2$s” and a link to their website in the information popover of the pencil button.', 'coquille-revue'),
+                esc_html__('%1$s: show “Coquille Revue plugin · by %2$s” and a link to their website in the information popover of the pencil button.', 'coquille-revue'),
                 '<strong>' . esc_html__('Credit', 'coquille-revue') . '</strong>',
                 esc_html(COQUILLE_REVUE_AUTHOR)
             )

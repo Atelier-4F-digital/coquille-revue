@@ -69,6 +69,8 @@ All notable changes to Coquille Revue. Format based on [Keep a Changelog](https:
 - Public interface: the selected passage stays highlighted while the bubble is open (CSS Custom Highlight API, in recent browsers); the browser cleared the selection as soon as the field took the focus.
 - Public interface: “Your text is too long” shows again. Since 2.6.0 validates every field, a too long field gets a 400 error, which the script did not recognize.
 - Public interface: error messages are announced at once (`role="alert"`), and the information popover is a named region. Public pages no longer carry four HTML comments in French.
+- French translation: the email signature no longer reads “L’équipe de Acme…” (missing elision before a vowel) but “L’équipe du site « Acme… »”, and the review bar reads “Sélectionnez du texte ou faites un cliquer-glisser sur une zone”.
+- The label of the Credit setting quotes the credit as it is shown (“Coquille Revue plugin · by Atelier 4F Digital”), like the README files.
 - Admin page and CSV export: an area without text shows “(area without text)” in the language of the screen instead of the stored marker. The stored value, `(zone without text)`, does not change and stays in the exports for Claude Code.
 
 ### Security
