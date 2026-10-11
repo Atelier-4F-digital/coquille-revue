@@ -83,7 +83,7 @@ Vous avez trouvé une faille ? Merci de la signaler en privé : voir [SECURITY.m
 
 ## Données personnelles
 
-- **Enregistré** : le texte et la suggestion, l'adresse de la page, l'adresse IP ; pour un visiteur, son nom et son e-mail s'il les indique (facultatifs) ; pour une personne connectée, son nom d'affichage et l'e-mail de son compte (si elle est membre du site).
+- **Enregistré** : le texte et la suggestion, l'adresse de la page, l'adresse IP ; pour un visiteur, son nom et son e-mail s'il les indique (facultatifs) ; pour une personne connectée, son nom d'affichage et l'e-mail de son compte (si elle est membre du site et que le remerciement est activé).
 - **Visible** : texte, suggestion et nom pour les éditeurs et administrateurs ; adresse IP pour les administrateurs (page d'admin, export CSV). L'e-mail n'est affiché nulle part : il sert au remerciement et aux outils RGPD de WordPress. L'e-mail et l'IP ne sont **jamais** transmis à Claude Code.
 - **Durées** : l'adresse IP est effacée au bout de 30 jours ; l'e-mail et le nom d'un visiteur dans les 24 heures qui suivent le traitement de l'annotation (appliquée, rejetée ou archivée), et au plus tard au bout de 6 mois.
 - **Outils WordPress** : un texte est proposé pour votre politique de confidentialité (**Réglages > Confidentialité**), et les demandes d'export ou d'effacement de données (**Outils**) prennent en compte les annotations.

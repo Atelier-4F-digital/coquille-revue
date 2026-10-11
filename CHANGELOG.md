@@ -85,6 +85,9 @@ All notable changes to Coquille Revue. Format based on [Keep a Changelog](https:
   - `style=` attributes are refused like `on…=` ones;
   - a tag, an HTML comment, a link or a shortcode of the replacement text must appear verbatim in the original text: a link swapped for another one is refused, not only an extra one;
   - a text that the checks cannot read is refused.
+- Anti-spam: an IPv4 address written as IPv6 (`::ffff:a.b.c.d`, given by some dual-stack servers) keeps its own limit; all IPv4 visitors used to share one counter, so a single one of them could block everyone else.
+- REST API: each element name of the XPath is limited to 64 characters (a longer one is a sentence written with hyphens).
+- When the thank-you email is off, the account email of a logged-in user is no longer stored either: it only serves that email.
 - WP-CLI `apply --text-file` only reads a `.txt` file inside the `.coquille-revue` folder of the current directory (where the Claude Code plugin writes it): a booby-trapped annotation can no longer get a secret file such as `.env` copied into a page.
 
 ## [2.5.0] — 2026-10-09 — first public release

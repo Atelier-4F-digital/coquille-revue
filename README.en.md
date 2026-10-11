@@ -83,7 +83,7 @@ Found a vulnerability? Please report it privately: see [SECURITY.md](SECURITY.md
 
 ## Personal data
 
-- **Stored**: the text and suggestion, the page address, the IP address; for a visitor, their name and email if provided (optional); for a logged-in user, their display name and account email (if they are a member of the site).
+- **Stored**: the text and suggestion, the page address, the IP address; for a visitor, their name and email if provided (optional); for a logged-in user, their display name and account email (if they are a member of the site and the thank-you email is on).
 - **Visible**: text, suggestion and name to editors and administrators; IP address to administrators (admin page, CSV export). The email is never displayed: it is only used for the thank-you message and WordPress privacy tools. Email and IP are **never** sent to Claude Code.
 - **Retention**: the IP address is erased after 30 days; a visitor's email and name within 24 hours after the annotation is handled (applied, rejected or archived), and after 6 months at the latest.
 - **WordPress tools**: a text is suggested for your privacy policy (**Settings > Privacy**), and personal data export and erasure requests (**Tools**) include annotations.

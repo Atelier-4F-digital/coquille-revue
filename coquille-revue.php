@@ -562,10 +562,15 @@ function coquille_revue_get_client_ip() {
     return '0.0.0.0';
 }
 
-// Clé de limite d'envoi : en IPv6 un abonné dispose d'un bloc /64 entier, on compte donc le bloc.
+// Clé de limite d'envoi : en IPv6 un abonné dispose d'un bloc /64 entier, on compte donc le bloc. Une adresse IPv4
+// présentée en IPv6 (::ffff:a.b.c.d, serveurs à double pile) garde sa propre clé : sinon tous les visiteurs IPv4
+// partageraient le bloc ::/64, et un seul d'entre eux épuiserait la limite de tous.
 function coquille_revue_ip_key($ip) {
     $bin = inet_pton($ip);
-    return 'coquille_revue_rl_' . md5($bin !== false && strlen($bin) === 16 ? substr($bin, 0, 8) : $ip);
+    if ($bin !== false && strlen($bin) === 16) {
+        $ip = strpos($bin, str_repeat("\0", 10) . "\xff\xff") === 0 ? inet_ntop(substr($bin, 12)) : substr($bin, 0, 8);
+    }
+    return 'coquille_revue_rl_' . md5($ip);
 }
 
 // Compteurs à fenêtre fixe : la fenêtre part du premier envoi et ne s'allonge pas à chaque envoi.
@@ -641,10 +646,11 @@ function coquille_revue_save_annotation(WP_REST_Request $request) {
         }
     }
 
-    // XPath et sélecteur CSS ont la forme produite par le script de la page, rien d'autre
+    // XPath et sélecteur CSS ont la forme produite par le script de la page, rien d'autre (un nom de balise de plus
+    // de 64 caractères n'existe pas : ce serait une phrase écrite avec des tirets)
     $xpath = (string) $request->get_param('xpath');
     $css   = (string) $request->get_param('cssSelector');
-    if (!preg_match('~^/html(/body|(/[a-z][a-z0-9:-]*\[\d{1,5}\])+)$~', $xpath)
+    if (!preg_match('~^/html(/body|(/[a-z][a-z0-9:-]{0,63}\[\d{1,5}\])+)$~', $xpath)
         || ($css !== '' && !preg_match('~^[^\s<>"\'`]+( > [^\s<>"\'`]+)*$~u', $css))) {
         return new WP_Error('invalid_selector', __('Invalid position in the page.', 'coquille-revue'), ['status' => 400]);
     }
@@ -677,12 +683,12 @@ function coquille_revue_save_annotation(WP_REST_Request $request) {
     $zone  = $mode === 'zone' ? coquille_revue_clean_zone($request->get_param('zoneData')) : null;
     $type  = in_array($request->get_param('type'), ['correction', 'suggestion', 'question'], true) ? $request->get_param('type') : 'correction';
 
-    // E-mail du compte seulement s'il est membre de ce site : en multisite, la connexion vaut pour tout le réseau.
-    // Visiteur : son e-mail n'est gardé que si le site envoie les remerciements.
+    // E-mail gardé seulement si le site envoie les remerciements (il ne sert qu'à cela) ; pour un compte, seulement
+    // s'il est membre de ce site : en multisite, la connexion vaut pour tout le réseau.
     $reviewer_name        = $request->get_param('reviewerName');
     $reviewer_email_param = (string) $request->get_param('reviewerEmail');
     if ($is_logged) {
-        $reviewer_email = is_user_member_of_blog($user->ID) ? $user->user_email : null;
+        $reviewer_email = coquille_revue_thanks_enabled() && is_user_member_of_blog($user->ID) ? $user->user_email : null;
     } else {
         $reviewer_email = coquille_revue_thanks_enabled() && is_email($reviewer_email_param) ? $reviewer_email_param : null;
     }

@@ -56,7 +56,7 @@ What is stored with each annotation:
 
 * the selected text, the remark, the page address (without query string or anchor), the position of the text in the page and the IP address of the submitter;
 * for a visitor: the name and the email address, if they choose to give them (the email field is only shown when the thank-you email is on);
-* for a logged-in user: their display name, and the email address of their account if they are a member of the site.
+* for a logged-in user: their display name, and the email address of their account if they are a member of the site and the thank-you email is on.
 
 Who can see it: the text, the remark and the name are visible to the users who manage annotations (editors and above by default). The IP address is visible to administrators only (admin page and CSV export). The email address is shown nowhere: it is only used for the thank-you email and by the WordPress personal data tools. Neither the email nor the IP address is included in the REST API, the JSON and Markdown exports or the WP-CLI output.
 

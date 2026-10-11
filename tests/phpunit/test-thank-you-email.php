@@ -84,6 +84,14 @@ class Test_Coquille_Revue_Thank_You_Email extends Coquille_Revue_Test_Case {
         $this->assertNull($this->last_annotation()['reviewer_email']);
     }
 
+    public function test_setting_off_stores_no_account_email_either() {
+        update_option('coquille_revue_thank_contributors', 0);
+        wp_set_current_user(self::factory()->user->create(['role' => 'editor']));
+        $response = $this->post_annotation();
+        $this->assertSame(201, $response->get_status());
+        $this->assertNull($this->get_annotation($response->get_data()['id'])['reviewer_email']);
+    }
+
     public function test_filter_decides_annotation_by_annotation() {
         $seen = null;
         add_filter('coquille_revue_notify_contributor', function ($enabled, $row) use (&$seen) {
