@@ -297,7 +297,7 @@
       xpath: getXPath(elBehind),
       cssSelector: getCssSelector(elBehind),
       charOffsetStart: 0, charOffsetEnd: 0,
-      originalText: elText || '(zone sans texte direct)',
+      originalText: elText || '(zone without text)', // valeur enregistrée : marqueur fixe, jamais traduit
       zoneData: {
         x: Math.round(x + window.scrollX), y: Math.round(y + window.scrollY),
         w: Math.round(w), h: Math.round(h),

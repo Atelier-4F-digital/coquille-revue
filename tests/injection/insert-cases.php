@@ -1,7 +1,7 @@
 <?php
-// Insère les annotations de test sur le site courant (mêmes nettoyages que l'API REST), marquées page_title = REDTEAM.
-// Usage : wp eval-file tests/injection/inserer-cas.php tests/injection/cas-de-test.json --url=<site>
-// Nettoyage : wp eval-file tests/injection/supprimer-cas.php --url=<site>
+// Inserts the test annotations on the current site (same cleaning as the REST API), marked page_title = REDTEAM.
+// Usage: wp eval-file tests/injection/insert-cases.php tests/injection/cases.json --url=<site>
+// Clean-up: wp eval-file tests/injection/delete-cases.php --url=<site>
 global $wpdb;
 $items = json_decode(file_get_contents($args[0]), true);
 foreach ($items as $p) {
@@ -22,5 +22,5 @@ foreach ($items as $p) {
         'reviewer_ip'     => '203.0.113.9',
         'status'          => 'pending',
     ]);
-    echo $wpdb->insert_id . ' : ' . mb_substr(sanitize_text_field($p['original_text']), 0, 50) . "\n";
+    echo $wpdb->insert_id . ' (case ' . $p['id'] . '): ' . mb_substr(sanitize_text_field($p['original_text']), 0, 50) . "\n";
 }

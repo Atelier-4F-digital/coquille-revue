@@ -1,7 +1,7 @@
 {
   "name": "coquille-revue",
-  "version": "2.5.0",
-  "description": "Applique, avec l'accord de l'utilisateur, les corrections laissées par des relecteurs sur un site WordPress avec l'extension Coquille Revue. Passe par WP-CLI : aucun mot de passe, et le texte des visiteurs ne transite jamais par une ligne de commande.",
+  "version": "2.6.0",
+  "description": "Applies, with the user's approval, the corrections left by reviewers on a WordPress site running the Coquille Revue plugin (2.6.0 or later). Works through WP-CLI: no password, and the visitors' text never goes through a command line.",
   "author": {
     "name": "Atelier 4F Digital",
     "url": "https://atelier4fdigital.com"
@@ -9,5 +9,5 @@
   "homepage": "https://atelier4fdigital.com",
   "repository": "https://github.com/Atelier-4F-digital/coquille-revue",
   "license": "GPL-2.0-or-later",
-  "keywords": ["wordpress", "relecture", "correction", "wp-cli"]
+  "keywords": ["wordpress", "proofreading", "review", "wp-cli"]
 }
