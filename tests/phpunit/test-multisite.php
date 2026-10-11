@@ -64,10 +64,17 @@ class Test_Coquille_Revue_Multisite extends Coquille_Revue_Test_Case {
         [, $row] = $this->post_on_sub_site();
         $this->assertSame((string) $user, $row['author_id']);
         $this->assertNull($row['reviewer_email']);
+        switch_to_blog($this->blog_id);
+        $this->assertSame('registered_unverified', coquille_revue_json_row($row)['source'], 'no role on the sub-site');
+        $this->assertSame(1, get_transient('coquille_revue_rl_global')['n'], 'limited like a visitor, in the limit of the sub-site');
+        restore_current_blog();
 
         add_user_to_blog($this->blog_id, $user, 'author');
         [, $row] = $this->post_on_sub_site();
         $this->assertSame('editor@example.org', $row['reviewer_email']);
+        switch_to_blog($this->blog_id);
+        $this->assertSame('logged_in_user', coquille_revue_json_row($row)['source']);
+        restore_current_blog();
     }
 
     public function test_deleting_a_site_deletes_its_annotations() {

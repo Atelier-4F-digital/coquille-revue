@@ -64,10 +64,10 @@ function coquille_revue_show_credit() {
     return (bool) get_option('coquille_revue_show_credit', 0);
 }
 
-// Anti-spam
+// Anti-spam : valeurs par défaut (filtre coquille_revue_rate_limits)
 const COQUILLE_REVUE_RATE_LIMIT_PER_IP      = 5;     // annotations anonymes max par IP (bloc /64 en IPv6) en 5 minutes
 const COQUILLE_REVUE_RATE_LIMIT_PER_IP_HOUR = 10;    // et par heure : une seule IP ne peut pas épuiser le quota du site
-const COQUILLE_REVUE_RATE_LIMIT_PER_USER    = 60;    // annotations max par utilisateur connecté
+const COQUILLE_REVUE_RATE_LIMIT_PER_USER    = 60;    // annotations max par compte qui a un rôle sur le site
 const COQUILLE_REVUE_RATE_LIMIT_WINDOW      = 300;   // sur 5 minutes
 const COQUILLE_REVUE_GLOBAL_LIMIT           = 30;    // annotations anonymes max par heure et par site
 const COQUILLE_REVUE_DIGEST_DELAY           = 900;   // e-mail admin groupé toutes les 15 minutes au plus
@@ -586,6 +586,31 @@ function coquille_revue_ip_key($ip) {
     return 'coquille_revue_rl_' . md5($ip);
 }
 
+// Plafonds d'envoi. Le filtre coquille_revue_rate_limits reçoit et renvoie un tableau de nombres entiers positifs :
+// ip_5min et ip_hour par adresse IP (bloc /64 en IPv6), site_hour pour l'ensemble des envois non vérifiés du site,
+// user_5min par compte qui a un rôle sur le site. Une valeur absente ou invalide garde sa valeur par défaut.
+function coquille_revue_rate_limits() {
+    $limits = [
+        'ip_5min'   => COQUILLE_REVUE_RATE_LIMIT_PER_IP,
+        'ip_hour'   => COQUILLE_REVUE_RATE_LIMIT_PER_IP_HOUR,
+        'site_hour' => COQUILLE_REVUE_GLOBAL_LIMIT,
+        'user_5min' => COQUILLE_REVUE_RATE_LIMIT_PER_USER,
+    ];
+    $filtered = apply_filters('coquille_revue_rate_limits', $limits);
+    foreach ($limits as $key => $default) {
+        $value = is_array($filtered) && isset($filtered[$key]) && is_numeric($filtered[$key]) ? (int) $filtered[$key] : 0;
+        $limits[$key] = $value > 0 ? $value : $default;
+    }
+    return $limits;
+}
+
+// Compte qui a un rôle sur ce site (ou super-administrateur). En multisite, une connexion vaut pour tout le réseau :
+// sans rôle sur ce site, le compte n'y est pas plus vérifié qu'un visiteur anonyme.
+function coquille_revue_user_has_role($user_id) {
+    $user = $user_id ? get_userdata((int) $user_id) : false;
+    return $user && ($user->roles || is_super_admin($user->ID));
+}
+
 // Compteurs à fenêtre fixe : la fenêtre part du premier envoi et ne s'allonge pas à chaque envoi.
 function coquille_revue_rate_limited($key, $limit, $window) {
     $data = get_transient($key);
@@ -671,14 +696,16 @@ function coquille_revue_save_annotation(WP_REST_Request $request) {
     $is_logged = is_user_logged_in();
     $ip        = coquille_revue_get_client_ip();
 
-    // Connectés : limite par compte. Anonymes : limites par IP (5 minutes et heure), puis limite globale du site (contre la rotation d'IP).
-    if ($is_logged) {
-        $limits = [['coquille_revue_rl_u' . get_current_user_id(), COQUILLE_REVUE_RATE_LIMIT_PER_USER, COQUILLE_REVUE_RATE_LIMIT_WINDOW]];
+    // Compte qui a un rôle sur ce site : limite par compte. Visiteurs anonymes et comptes sans rôle sur ce site : limites
+    // par IP (5 minutes et heure), puis limite globale du site (contre la rotation d'IP).
+    $max = coquille_revue_rate_limits();
+    if ($is_logged && coquille_revue_user_has_role(get_current_user_id())) {
+        $limits = [['coquille_revue_rl_u' . get_current_user_id(), $max['user_5min'], COQUILLE_REVUE_RATE_LIMIT_WINDOW]];
     } else {
         $limits = [
-            [coquille_revue_ip_key($ip), COQUILLE_REVUE_RATE_LIMIT_PER_IP, COQUILLE_REVUE_RATE_LIMIT_WINDOW],
-            [coquille_revue_ip_key($ip) . '_h', COQUILLE_REVUE_RATE_LIMIT_PER_IP_HOUR, HOUR_IN_SECONDS],
-            ['coquille_revue_rl_global', COQUILLE_REVUE_GLOBAL_LIMIT, HOUR_IN_SECONDS],
+            [coquille_revue_ip_key($ip), $max['ip_5min'], COQUILLE_REVUE_RATE_LIMIT_WINDOW],
+            [coquille_revue_ip_key($ip) . '_h', $max['ip_hour'], HOUR_IN_SECONDS],
+            ['coquille_revue_rl_global', $max['site_hour'], HOUR_IN_SECONDS],
         ];
     }
     foreach ($limits as [$key, $limit, $window]) {
@@ -1484,9 +1511,14 @@ function coquille_revue_output_json($status) {
     echo $sep === "[\n" ? "[]\n}" : "\n    ]\n}";
 }
 
-// Provenance de l'annotation, en code fixe : un nom d'auteur anonyme n'est jamais vérifié.
+// Provenance de l'annotation, en code fixe : un nom d'auteur anonyme n'est jamais vérifié, pas plus que celui d'un
+// compte sans rôle sur ce site (registered_unverified : n'importe qui peut en créer un là où l'inscription est ouverte).
 function coquille_revue_annotation_source($row) {
-    return ((int) ($row['author_id'] ?? 0)) > 0 ? 'logged_in_user' : 'anonymous_unverified';
+    $author_id = (int) ($row['author_id'] ?? 0);
+    if ($author_id === 0) {
+        return 'anonymous_unverified';
+    }
+    return coquille_revue_user_has_role($author_id) ? 'logged_in_user' : 'registered_unverified';
 }
 
 // Texte d'origine pour l'affichage (page d'admin, CSV) : une zone sans texte est enregistrée avec un marqueur fixe,
@@ -2237,14 +2269,15 @@ function coquille_revue_admin_page() {
             '<span class="dashicons dashicons-lock" aria-hidden="true"></span> <strong>' . esc_html__('Private mode', 'coquille-revue') . '</strong>'
         );
     } else {
+        $max = coquille_revue_rate_limits();
         printf(
             /* translators: 1: "Public mode", in bold, 2: submissions per IP address, 3: number of minutes, 4: submissions per IP address and per hour, 5: anonymous submissions per hour for the site */
             esc_html__('%1$s — any visitor can annotate (per IP address, at most %2$d submissions in %3$d minutes and %4$d per hour; %5$d anonymous submissions per hour for the site; honeypot field against bots).', 'coquille-revue'),
             '<span class="dashicons dashicons-admin-site-alt3" aria-hidden="true"></span> <strong>' . esc_html__('Public mode', 'coquille-revue') . '</strong>',
-            (int) COQUILLE_REVUE_RATE_LIMIT_PER_IP,
+            (int) $max['ip_5min'],
             (int) (COQUILLE_REVUE_RATE_LIMIT_WINDOW / 60),
-            (int) COQUILLE_REVUE_RATE_LIMIT_PER_IP_HOUR,
-            (int) COQUILLE_REVUE_GLOBAL_LIMIT
+            (int) $max['ip_hour'],
+            (int) $max['site_hour']
         );
     }
     echo '</p>';

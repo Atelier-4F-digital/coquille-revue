@@ -55,7 +55,7 @@ If several anonymous annotations have the same date to the second, the same loca
 
 ### 2. Sort
 
-Show a table: number, type, mode, source (`logged_in_user` or `anonymous_unverified`: an anonymous author name is never verified), alerts, and your decision among "to offer", "change of meaning", "zone", "question", "nothing to change", "suspicious". After step 3, an annotation without any occurrence becomes "not found". A question calls for no change: suggest an answer or pass it on.
+Show a table: number, type, mode, source (`logged_in_user`, `registered_unverified` for a logged-in account without a role on the site, or `anonymous_unverified`: only `logged_in_user` comes from a member of the site, and an anonymous author name is never verified), alerts, and your decision among "to offer", "change of meaning", "zone", "question", "nothing to change", "suspicious". After step 3, an annotation without any occurrence becomes "not found". A question calls for no change: suggest an answer or pass it on.
 
 ### 3. Locate (annotations to offer, changes of meaning and zones)
 

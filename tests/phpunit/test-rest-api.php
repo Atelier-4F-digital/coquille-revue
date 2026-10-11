@@ -195,6 +195,39 @@ class Test_Coquille_Revue_Rest_Api extends Coquille_Revue_Test_Case {
         $this->assertSame(201, $this->post_annotation()->get_status());
     }
 
+    public function test_account_without_a_role_is_limited_like_a_visitor() {
+        $this->set_public_mode();
+        $nobody = self::factory()->user->create(['role' => '']);
+        wp_set_current_user($nobody);
+        set_transient(coquille_revue_ip_key('192.0.2.10') . '_h', ['n' => COQUILLE_REVUE_RATE_LIMIT_PER_IP_HOUR, 'start' => time()], HOUR_IN_SECONDS);
+        $this->assertSame(429, $this->post_annotation()->get_status(), 'per IP limit');
+
+        $_SERVER['REMOTE_ADDR'] = '192.0.2.11';
+        $response = $this->post_annotation();
+        $this->assertSame(201, $response->get_status());
+        $this->assertSame('registered_unverified', coquille_revue_annotation_source($this->get_annotation($response->get_data()['id'])));
+        $this->assertSame(1, get_transient('coquille_revue_rl_global')['n'], 'counted in the site limit');
+        $this->assertFalse(get_transient('coquille_revue_rl_u' . $nobody), 'no per-account counter');
+
+        // A subscriber has a role on the site: own limit per account, verified source.
+        $_SERVER['REMOTE_ADDR'] = '192.0.2.10';
+        wp_set_current_user(self::factory()->user->create(['role' => 'subscriber']));
+        $response = $this->post_annotation();
+        $this->assertSame(201, $response->get_status());
+        $this->assertSame('logged_in_user', coquille_revue_annotation_source($this->get_annotation($response->get_data()['id'])));
+    }
+
+    public function test_rate_limits_filter() {
+        $this->set_public_mode();
+        add_filter('coquille_revue_rate_limits', function ($limits) {
+            return ['ip_5min' => 2, 'site_hour' => '100', 'ip_hour' => -3, 'user_5min' => 'many'] + $limits;
+        });
+        $this->assertSame(['ip_5min' => 2, 'ip_hour' => COQUILLE_REVUE_RATE_LIMIT_PER_IP_HOUR, 'site_hour' => 100, 'user_5min' => COQUILLE_REVUE_RATE_LIMIT_PER_USER], coquille_revue_rate_limits());
+        $this->assertSame(201, $this->post_annotation()->get_status());
+        $this->assertSame(201, $this->post_annotation()->get_status());
+        $this->assertSame(429, $this->post_annotation()->get_status());
+    }
+
     public function test_logged_in_user_limit() {
         $user = self::factory()->user->create(['role' => 'editor']);
         wp_set_current_user($user);

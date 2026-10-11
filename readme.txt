@@ -19,7 +19,7 @@ A pencil button floats on every page. A reviewer turns on review mode, selects s
 = Who can annotate =
 
 * **Private mode (default):** only logged-in users who can edit posts (contributors and above).
-* **Public mode:** any visitor. An administrator (the network administrator on multisite) switches it on from the admin page, or locks the mode in `wp-config.php` with `COQUILLE_REVUE_REQUIRE_LOGIN`. Anonymous submissions go through anti-spam protection: a honeypot field, at most 5 submissions per IP address in 5 minutes and 10 per hour (per /64 block for IPv6), and at most 30 anonymous submissions per hour for the site.
+* **Public mode:** any visitor. An administrator (the network administrator on multisite) switches it on from the admin page, or locks the mode in `wp-config.php` with `COQUILLE_REVUE_REQUIRE_LOGIN`. Anonymous submissions go through anti-spam protection: a honeypot field, at most 5 submissions per IP address in 5 minutes and 10 per hour (per /64 block for IPv6), and at most 30 anonymous submissions per hour for the site. A logged-in account without a role on the site counts as an anonymous visitor.
 
 = Processing annotations =
 
@@ -44,7 +44,7 @@ The interface is in English and French (a complete French translation is include
 
 = For developers =
 
-* Filters: `coquille_revue_manage_capability` (who manages annotations, `edit_others_posts` by default), `coquille_revue_load_overlay` (return `false` to hide the review button on a page), `coquille_revue_notify_contributor` (send the thank-you email or not, per annotation), `coquille_revue_contributor_email` (customize that email), `coquille_revue_cli_writable_options` (options that `wp coquille-revue apply` may change).
+* Filters: `coquille_revue_manage_capability` (who manages annotations, `edit_others_posts` by default), `coquille_revue_load_overlay` (return `false` to hide the review button on a page), `coquille_revue_notify_contributor` (send the thank-you email or not, per annotation), `coquille_revue_contributor_email` (customize that email), `coquille_revue_cli_writable_options` (options that `wp coquille-revue apply` may change), `coquille_revue_rate_limits` (submission limits).
 * Constants for `wp-config.php`: `COQUILLE_REVUE_REQUIRE_LOGIN` (lock private or public mode), `COQUILLE_REVUE_TRUSTED_PROXY_HEADER` (header that holds the visitor IP address behind a trusted proxy, for example `HTTP_CF_CONNECTING_IP`).
 * REST API under `coquille-revue/v1`: `POST /annotation` (submit), `GET /annotations` and `PATCH /annotation/{id}/status` (for users who manage annotations).
 
