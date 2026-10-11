@@ -1,18 +1,18 @@
 #!/usr/bin/env bash
-# Construit build/coquille-revue-<version>.zip à partir du dernier commit.
-# Les fichiers marqués export-ignore dans .gitattributes sont exclus.
+# Builds build/coquille-revue-<version>.zip from the last commit.
+# Files marked export-ignore in .gitattributes are left out.
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
 version=$(git show HEAD:coquille-revue.php | sed -n 's/^ \* Version:[[:space:]]*//p' | tr -d '\r' | sed 's/[[:space:]]*$//')
 if [ -z "$version" ]; then
-  echo "Version introuvable dans coquille-revue.php" >&2
+  echo "Version not found in coquille-revue.php" >&2
   exit 1
 fi
 
 if [ -n "$(git status --porcelain)" ]; then
-  echo "Attention : des modifications ne sont pas commitées, elles ne seront pas dans le zip." >&2
+  echo "Warning: uncommitted changes will not be in the zip." >&2
 fi
 
 mkdir -p build
