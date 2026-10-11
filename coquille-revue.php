@@ -21,6 +21,12 @@ const COQUILLE_REVUE_DB_VERSION = '3';
 const COQUILLE_REVUE_AUTHOR_URL = 'https://atelier4fdigital.com';
 const COQUILLE_REVUE_AUTHOR     = 'Atelier 4F Digital';
 
+// Traductions : textes source en anglais, fichiers livrés dans languages/ (un paquet de langue de WordPress.org
+// passe avant). Aucun texte traduit n'est demandé avant init.
+add_action('init', function () {
+    load_plugin_textdomain('coquille-revue', false, dirname(plugin_basename(__FILE__)) . '/languages');
+});
+
 // Mode public/privé (réglage réseau) :
 // - Si COQUILLE_REVUE_REQUIRE_LOGIN est défini dans wp-config.php : override absolu
 // - Sinon : option "coquille_revue_require_login" (0/1), privé par défaut
@@ -259,22 +265,36 @@ function coquille_revue_overlay_enabled() {
     return (bool) apply_filters('coquille_revue_load_overlay', true);
 }
 
-// Textes du script, passés par la configuration (aucun texte n'est écrit dans overlay.js).
+// Textes du script, passés par la configuration (aucun texte n'est écrit dans overlay.js, qui les affiche
+// en textContent : une traduction n'est jamais interprétée comme du HTML).
 function coquille_revue_overlay_strings() {
     return [
-        'textSelected'       => 'Texte sélectionné',
-        'zoneSelected'       => 'Zone sélectionnée (%1$s×%2$s)',
-        'quoted'             => '« %s »',
-        'zonePreview'        => '%1$s — « %2$s »',
-        'send'               => 'Envoyer',
-        'sending'            => 'Envoi…',
-        'sent'               => 'Merci, votre suggestion a été envoyée',
-        'errorEmail'         => 'Adresse e-mail invalide.',
-        'errorTooLong'       => 'Votre texte est trop long.',
-        'errorRateLimited'   => 'Trop d’envois pour le moment, réessayez dans quelques minutes.',
-        'errorLoginRequired' => 'Connectez-vous pour proposer une correction.',
-        'errorForbidden'     => 'Vous n’avez pas les droits pour proposer une correction.',
-        'errorGeneric'       => 'Envoi impossible (erreur %s).',
+        'textSelected'       => __('Selected text', 'coquille-revue'),
+        /* translators: 1: width of the selected area in pixels, 2: its height in pixels */
+        'zoneSelected'       => __('Selected area (%1$s×%2$s)', 'coquille-revue'),
+        /* translators: %s: quoted text; use the quotation marks of your language */
+        'quoted'             => _x('“%s”', 'quoted text', 'coquille-revue'),
+        /* translators: 1: CSS selector of the selected area, 2: text found in the area */
+        'zonePreview'        => __('%1$s — “%2$s”', 'coquille-revue'),
+        'send'               => __('Send', 'coquille-revue'),
+        'sending'            => __('Sending…', 'coquille-revue'),
+        'sent'               => __('Thank you, your suggestion has been sent', 'coquille-revue'),
+        'errorEmail'         => __('Invalid email address.', 'coquille-revue'),
+        'errorTooLong'       => __('Your text is too long.', 'coquille-revue'),
+        'errorRateLimited'   => __('Too many submissions for now, please try again in a few minutes.', 'coquille-revue'),
+        'errorLoginRequired' => __('Log in to suggest a correction.', 'coquille-revue'),
+        'errorForbidden'     => __('You are not allowed to suggest a correction.', 'coquille-revue'),
+        /* translators: %s: HTTP status code */
+        'errorGeneric'       => __('Sending failed (error %s).', 'coquille-revue'),
+    ];
+}
+
+// Libellés des types de remarque ; les valeurs enregistrées restent correction, suggestion et question.
+function coquille_revue_type_labels() {
+    return [
+        'correction' => _x('Correction', 'type of remark', 'coquille-revue'),
+        'suggestion' => _x('Suggestion', 'type of remark', 'coquille-revue'),
+        'question'   => _x('Question', 'type of remark', 'coquille-revue'),
     ];
 }
 
@@ -309,6 +329,21 @@ function coquille_revue_render_overlay() {
     $privacy   = get_privacy_policy_url();
     $ask_email = coquille_revue_thanks_enabled();
     $max       = COQUILLE_REVUE_MAX_LENGTHS;
+    $types     = coquille_revue_type_labels();
+    $new_tab   = __('(opens in a new tab)', 'coquille-revue');
+
+    if ($is_logged) {
+        $notice = __('Your suggestion is saved with your account name.', 'coquille-revue');
+    } elseif ($ask_email) {
+        $notice = __('Name and email are optional. The email is only used to let you know when your suggestion is applied, then it is deleted.', 'coquille-revue');
+    } else {
+        $notice = __('Name is optional.', 'coquille-revue');
+    }
+    $notice .= ' ' . sprintf(
+        /* translators: %d: number of days */
+        _n('The IP address is kept for %d day to fight spam.', 'The IP address is kept for %d days to fight spam.', COQUILLE_REVUE_IP_RETENTION_DAYS, 'coquille-revue'),
+        COQUILLE_REVUE_IP_RETENTION_DAYS
+    ) . ' ' . __('Suggestions may be processed with an AI assistant.', 'coquille-revue');
     // Icônes : SVG en ligne (pas d'emoji), décoratives, donc masquées aux lecteurs d'écran.
     ?>
     <div id="coquille-revue-root">
@@ -317,7 +352,7 @@ function coquille_revue_render_overlay() {
     <div id="coquille-zone-highlight" aria-hidden="true"></div>
 
     <!-- Icône flottante toujours visible (crayon) : bouton à bascule du mode relecture -->
-    <button type="button" id="coquille-fab" aria-label="Mode relecture" aria-pressed="false" aria-describedby="coquille-info-text"<?php echo $is_logged ? ' aria-keyshortcuts="Alt+Shift+C"' : ''; ?>>
+    <button type="button" id="coquille-fab" aria-label="<?php esc_attr_e('Review mode', 'coquille-revue'); ?>" aria-pressed="false" aria-describedby="coquille-info-text"<?php echo $is_logged ? ' aria-keyshortcuts="Alt+Shift+C"' : ''; ?>>
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
         <path d="M12 20h9"/>
         <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>
@@ -326,67 +361,92 @@ function coquille_revue_render_overlay() {
 
     <!-- Fenêtre d'information : au survol ou au focus du crayon -->
     <div id="coquille-info-popover">
-      <p class="coquille-info-title"><svg class="coquille-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg> Aidez-nous à améliorer cette page</p>
-      <p id="coquille-info-text">Vous avez repéré une coquille, un texte à reformuler, ou une zone à améliorer ? Activez le mode relecture pour nous laisser une suggestion directement sur la page.</p>
+      <p class="coquille-info-title"><svg class="coquille-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg> <?php esc_html_e('Help us improve this page', 'coquille-revue'); ?></p>
+      <p id="coquille-info-text"><?php esc_html_e('Spotted a typo, some wording to rephrase or an area to improve? Turn on review mode to leave us a suggestion right on the page.', 'coquille-revue'); ?></p>
       <?php if ($is_logged): ?>
-      <p>Raccourci clavier : <kbd>Alt</kbd> + <kbd>Maj</kbd> + <kbd>C</kbd></p>
+      <p><?php
+        printf(
+            /* translators: %s: the keys of the keyboard shortcut */
+            esc_html__('Keyboard shortcut: %s', 'coquille-revue'),
+            '<kbd>Alt</kbd> + <kbd>' . esc_html_x('Shift', 'keyboard key', 'coquille-revue') . '</kbd> + <kbd>C</kbd>'
+        );
+      ?></p>
       <?php endif; ?>
-      <button type="button" class="coquille-info-cta" id="coquille-info-start"><svg class="coquille-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg> Commencer la relecture</button>
+      <button type="button" class="coquille-info-cta" id="coquille-info-start"><svg class="coquille-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg> <?php esc_html_e('Start reviewing', 'coquille-revue'); ?></button>
       <?php if (coquille_revue_show_credit()): ?>
       <div class="coquille-info-credit">
-        Plugin <strong>Coquille Revue</strong> · proposé par
-        <a href="<?php echo esc_url(COQUILLE_REVUE_AUTHOR_URL); ?>" target="_blank" rel="noopener noreferrer"><?php echo esc_html(COQUILLE_REVUE_AUTHOR); ?> <span aria-hidden="true">↗</span><span class="coquille-sr-only"> (nouvel onglet)</span></a>
+        <?php
+        printf(
+            /* translators: 1: plugin name, 2: author name, linked to the author's website */
+            esc_html__('%1$s plugin · by %2$s', 'coquille-revue'),
+            '<strong>Coquille Revue</strong>',
+            '<a href="' . esc_url(COQUILLE_REVUE_AUTHOR_URL) . '" target="_blank" rel="noopener noreferrer">' . esc_html(COQUILLE_REVUE_AUTHOR)
+                . ' <span aria-hidden="true">↗</span><span class="coquille-sr-only"> ' . esc_html($new_tab) . '</span></a>'
+        );
+        ?>
       </div>
       <?php endif; ?>
     </div>
 
     <!-- Barre de contrôles (visible quand mode actif) -->
-    <div id="coquille-bar" role="region" aria-label="Barre de relecture">
+    <div id="coquille-bar" role="region" aria-label="<?php esc_attr_e('Review toolbar', 'coquille-revue'); ?>">
       <span class="coquille-dot" aria-hidden="true"></span>
       <span id="coquille-label">
         <?php if ($is_logged): ?>
-          Mode relecture — connecté en tant que <strong><?php echo esc_html($user_name); ?></strong>
+          <?php
+          printf(
+              /* translators: %s: display name of the logged-in user */
+              esc_html__('Review mode — logged in as %s', 'coquille-revue'),
+              '<strong>' . esc_html($user_name) . '</strong>'
+          );
+          ?>
         <?php else: ?>
-          Mode relecture
+          <?php esc_html_e('Review mode', 'coquille-revue'); ?>
         <?php endif; ?>
       </span>
       <span id="coquille-hint">
         <svg class="coquille-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M4 7V4h16v3"/><path d="M9 20h6"/><path d="M12 4v16"/></svg>
-        <span>Sélectionnez du texte<span class="coquille-hint-zone"> ou <kbd>clic + glisser</kbd> sur une zone</span><span class="coquille-sr-only">. Au clavier : sélectionnez le texte, puis appuyez sur Entrée</span></span>
+        <span><?php esc_html_e('Select some text', 'coquille-revue'); ?><span class="coquille-hint-zone"> <?php
+          printf(
+              /* translators: %s: "click and drag", shown as a key combination */
+              esc_html__('or %s over an area', 'coquille-revue'),
+              '<kbd>' . esc_html__('click and drag', 'coquille-revue') . '</kbd>'
+          );
+        ?></span><span class="coquille-sr-only">. <?php esc_html_e('With the keyboard: select the text, then press Enter', 'coquille-revue'); ?></span></span>
       </span>
-      <button type="button" id="coquille-stop-btn"><svg class="coquille-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="6" y="6" width="12" height="12" rx="2"/></svg> Arrêter</button>
+      <button type="button" id="coquille-stop-btn"><svg class="coquille-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="6" y="6" width="12" height="12" rx="2"/></svg> <?php echo esc_html_x('Stop', 'leave review mode', 'coquille-revue'); ?></button>
     </div>
 
     <!-- Bulle d'annotation -->
     <div id="coquille-bubble" role="dialog" aria-labelledby="coquille-bubble-title" aria-describedby="coquille-original-text">
       <div id="coquille-bubble-header">
-        <span id="coquille-bubble-title">Texte sélectionné</span>
-        <button type="button" id="coquille-bubble-close" aria-label="Fermer"><svg class="coquille-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button>
+        <span id="coquille-bubble-title"><?php esc_html_e('Selected text', 'coquille-revue'); ?></span>
+        <button type="button" id="coquille-bubble-close" aria-label="<?php esc_attr_e('Close', 'coquille-revue'); ?>"><svg class="coquille-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button>
       </div>
       <div id="coquille-original-text"></div>
       <?php if (!$is_logged): ?>
       <div id="coquille-reviewer-row">
-        <label class="coquille-sr-only" for="coquille-reviewer-name">Votre nom (facultatif)</label>
-        <input id="coquille-reviewer-name" type="text" placeholder="Votre nom (facultatif)" maxlength="<?php echo (int) $max['reviewerName']; ?>" autocomplete="name">
+        <label class="coquille-sr-only" for="coquille-reviewer-name"><?php esc_html_e('Your name (optional)', 'coquille-revue'); ?></label>
+        <input id="coquille-reviewer-name" type="text" placeholder="<?php esc_attr_e('Your name (optional)', 'coquille-revue'); ?>" maxlength="<?php echo (int) $max['reviewerName']; ?>" autocomplete="name">
         <?php if ($ask_email): ?>
-        <label class="coquille-sr-only" for="coquille-reviewer-email">Votre e-mail (facultatif)</label>
-        <input id="coquille-reviewer-email" type="email" placeholder="Votre e-mail (facultatif)" maxlength="<?php echo (int) $max['reviewerEmail']; ?>" autocomplete="email">
+        <label class="coquille-sr-only" for="coquille-reviewer-email"><?php esc_html_e('Your email (optional)', 'coquille-revue'); ?></label>
+        <input id="coquille-reviewer-email" type="email" placeholder="<?php esc_attr_e('Your email (optional)', 'coquille-revue'); ?>" maxlength="<?php echo (int) $max['reviewerEmail']; ?>" autocomplete="email">
         <?php endif; ?>
       </div>
       <?php endif; ?>
-      <p id="coquille-privacy"><?php if ($is_logged): ?>Votre suggestion est enregistrée avec votre nom de compte.<?php elseif ($ask_email): ?>Nom et e-mail facultatifs. L'e-mail sert uniquement à vous prévenir quand votre suggestion est appliquée, puis il est effacé.<?php else: ?>Nom facultatif.<?php endif; ?> L'adresse IP est conservée <?php echo (int) COQUILLE_REVUE_IP_RETENTION_DAYS; ?> jours contre le spam. Les suggestions peuvent être traitées avec un assistant IA.<?php if ($privacy): ?> <a href="<?php echo esc_url($privacy); ?>" target="_blank" rel="noopener noreferrer">Confidentialité<span class="coquille-sr-only"> (nouvel onglet)</span></a><?php endif; ?></p>
-      <label class="coquille-sr-only" for="coquille-textarea">Votre suggestion</label>
-      <textarea id="coquille-textarea" placeholder="Votre suggestion…" aria-describedby="coquille-textarea-help" enterkeyhint="send" maxlength="<?php echo (int) COQUILLE_REVUE_MAX_TEXT_LENGTH; ?>"></textarea>
-      <p id="coquille-textarea-help"><span class="coquille-help-keys">Entrée pour envoyer · Maj+Entrée pour aller à la ligne · Échap pour annuler</span><span class="coquille-help-touch">Touche Entrée ou bouton « Envoyer » pour envoyer</span></p>
-      <div id="coquille-type-row" role="group" aria-label="Type de remarque">
-        <button type="button" class="coquille-type-btn" data-type="correction" aria-pressed="true"><svg class="coquille-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg> Correction</button>
-        <button type="button" class="coquille-type-btn" data-type="suggestion" aria-pressed="false"><svg class="coquille-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M9 18h6"/><path d="M10 22h4"/><path d="M12 2a7 7 0 0 0-4 12.74V16h8v-1.26A7 7 0 0 0 12 2z"/></svg> Suggestion</button>
-        <button type="button" class="coquille-type-btn" data-type="question" aria-pressed="false"><svg class="coquille-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg> Question</button>
+      <p id="coquille-privacy"><?php echo esc_html($notice); ?><?php if ($privacy): ?> <a href="<?php echo esc_url($privacy); ?>" target="_blank" rel="noopener noreferrer"><?php esc_html_e('Privacy', 'coquille-revue'); ?><span class="coquille-sr-only"> <?php echo esc_html($new_tab); ?></span></a><?php endif; ?></p>
+      <label class="coquille-sr-only" for="coquille-textarea"><?php esc_html_e('Your suggestion', 'coquille-revue'); ?></label>
+      <textarea id="coquille-textarea" placeholder="<?php esc_attr_e('Your suggestion…', 'coquille-revue'); ?>" aria-describedby="coquille-textarea-help" enterkeyhint="send" maxlength="<?php echo (int) COQUILLE_REVUE_MAX_TEXT_LENGTH; ?>"></textarea>
+      <p id="coquille-textarea-help"><span class="coquille-help-keys"><?php esc_html_e('Enter to send · Shift+Enter for a new line · Esc to cancel', 'coquille-revue'); ?></span><span class="coquille-help-touch"><?php esc_html_e('Press Enter or the Send button to send', 'coquille-revue'); ?></span></p>
+      <div id="coquille-type-row" role="group" aria-label="<?php esc_attr_e('Type of remark', 'coquille-revue'); ?>">
+        <button type="button" class="coquille-type-btn" data-type="correction" aria-pressed="true"><svg class="coquille-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg> <?php echo esc_html($types['correction']); ?></button>
+        <button type="button" class="coquille-type-btn" data-type="suggestion" aria-pressed="false"><svg class="coquille-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M9 18h6"/><path d="M10 22h4"/><path d="M12 2a7 7 0 0 0-4 12.74V16h8v-1.26A7 7 0 0 0 12 2z"/></svg> <?php echo esc_html($types['suggestion']); ?></button>
+        <button type="button" class="coquille-type-btn" data-type="question" aria-pressed="false"><svg class="coquille-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg> <?php echo esc_html($types['question']); ?></button>
       </div>
       <input id="coquille-hp" type="text" tabindex="-1" autocomplete="off" aria-hidden="true">
       <div id="coquille-actions">
-        <button type="button" id="coquille-send-btn">Envoyer</button>
-        <button type="button" id="coquille-cancel-btn">Annuler</button>
+        <button type="button" id="coquille-send-btn"><?php esc_html_e('Send', 'coquille-revue'); ?></button>
+        <button type="button" id="coquille-cancel-btn"><?php esc_html_e('Cancel', 'coquille-revue'); ?></button>
       </div>
     </div>
 
@@ -432,10 +492,10 @@ add_action('rest_api_init', function () {
 function coquille_revue_post_permission_check(WP_REST_Request $request) {
     if (coquille_revue_is_login_required()) {
         if (!is_user_logged_in()) {
-            return new WP_Error('rest_forbidden', 'Connexion requise.', ['status' => 401]);
+            return new WP_Error('rest_forbidden', __('You must be logged in to do this.', 'coquille-revue'), ['status' => 401]);
         }
         if (!current_user_can('edit_posts')) {
-            return new WP_Error('rest_forbidden', 'Droits insuffisants.', ['status' => 403]);
+            return new WP_Error('rest_forbidden', __('Sorry, you are not allowed to do this.', 'coquille-revue'), ['status' => 403]);
         }
     }
     // Mode public : on accepte ; limites d'envoi et champ piège dans le callback.
@@ -444,10 +504,10 @@ function coquille_revue_post_permission_check(WP_REST_Request $request) {
 
 function coquille_revue_admin_permission_check() {
     if (!is_user_logged_in()) {
-        return new WP_Error('rest_forbidden', 'Connexion requise.', ['status' => 401]);
+        return new WP_Error('rest_forbidden', __('You must be logged in to do this.', 'coquille-revue'), ['status' => 401]);
     }
     if (!coquille_revue_can_manage()) {
-        return new WP_Error('rest_forbidden', 'Droits insuffisants.', ['status' => 403]);
+        return new WP_Error('rest_forbidden', __('Sorry, you are not allowed to do this.', 'coquille-revue'), ['status' => 403]);
     }
     return true;
 }
@@ -554,26 +614,27 @@ function coquille_revue_clean_zone($zone) {
 function coquille_revue_save_annotation(WP_REST_Request $request) {
     // Honeypot : si rempli = bot
     if (!empty($request->get_param('hp'))) {
-        return new WP_Error('spam_detected', 'Suspicious request.', ['status' => 400]);
+        return new WP_Error('spam_detected', __('Suspicious request.', 'coquille-revue'), ['status' => 400]);
     }
 
     // Moins de 2 caractères : rien à corriger, et un texte aussi court se retrouverait partout dans le site
     foreach (['originalText', 'suggestion'] as $f) {
         if (mb_strlen(trim((string) $request->get_param($f))) < 2) {
-            return new WP_Error('too_short', "Champ {$f} trop court.", ['status' => 400]);
+            /* translators: %s: technical name of the field (originalText or suggestion) */
+            return new WP_Error('too_short', sprintf(__('The %s field is too short.', 'coquille-revue'), $f), ['status' => 400]);
         }
     }
 
     // Seules les pages de ce site peuvent être annotées ; on ne garde ni paramètres ni ancre (jetons possibles)
     $url = coquille_revue_clean_url($request->get_param('url'));
     if ($url === '' || !coquille_revue_url_belongs_to_site($url)) {
-        return new WP_Error('invalid_url', 'Adresse de page invalide.', ['status' => 400]);
+        return new WP_Error('invalid_url', __('Invalid page address.', 'coquille-revue'), ['status' => 400]);
     }
 
     // Caractères de contrôle bidirectionnel : ils servent à cacher ou inverser du texte
     foreach (['originalText', 'suggestion', 'reviewerName', 'pageTitle', 'xpath', 'cssSelector'] as $f) {
         if (preg_match('/[\x{202A}-\x{202E}\x{2066}-\x{2069}]/u', (string) $request->get_param($f))) {
-            return new WP_Error('invalid_chars', 'Caractères non autorisés.', ['status' => 400]);
+            return new WP_Error('invalid_chars', __('Characters not allowed.', 'coquille-revue'), ['status' => 400]);
         }
     }
 
@@ -582,7 +643,7 @@ function coquille_revue_save_annotation(WP_REST_Request $request) {
     $css   = (string) $request->get_param('cssSelector');
     if (!preg_match('~^/html(/body|(/[a-z][a-z0-9:-]*\[\d{1,5}\])+)$~', $xpath)
         || ($css !== '' && !preg_match('~^[^\s<>"\'`]+( > [^\s<>"\'`]+)*$~u', $css))) {
-        return new WP_Error('invalid_selector', 'Position dans la page invalide.', ['status' => 400]);
+        return new WP_Error('invalid_selector', __('Invalid position in the page.', 'coquille-revue'), ['status' => 400]);
     }
 
     $is_logged = is_user_logged_in();
@@ -600,7 +661,7 @@ function coquille_revue_save_annotation(WP_REST_Request $request) {
     }
     foreach ($limits as [$key, $limit, $window]) {
         if (coquille_revue_rate_limited($key, $limit, $window)) {
-            return new WP_Error('rate_limited', 'Trop de soumissions, réessayez plus tard.', ['status' => 429]);
+            return new WP_Error('rate_limited', __('Too many submissions, please try again later.', 'coquille-revue'), ['status' => 429]);
         }
     }
     foreach ($limits as [$key, , $window]) {
@@ -647,7 +708,7 @@ function coquille_revue_save_annotation(WP_REST_Request $request) {
     ]);
 
     if (!$ok) {
-        return new WP_Error('db_error', 'Erreur de sauvegarde.', ['status' => 500]);
+        return new WP_Error('db_error', __('The annotation could not be saved.', 'coquille-revue'), ['status' => 500]);
     }
 
     $id = (int) $wpdb->insert_id;
@@ -736,12 +797,12 @@ function coquille_revue_set_status($id, $status) {
     $table = coquille_revue_table();
     $blog  = get_current_blog_id();
     if (!in_array($status, COQUILLE_REVUE_STATUSES, true)) {
-        return new WP_Error('invalid_status', 'Statut invalide.', ['status' => 400]);
+        return new WP_Error('invalid_status', __('Invalid status.', 'coquille-revue'), ['status' => 400]);
     }
     // phpcs:ignore WordPress.DB.DirectDatabaseQuery -- plugin table, row read just before it changes.
     $row = $wpdb->get_row($wpdb->prepare('SELECT * FROM %i WHERE id = %d AND blog_id = %d', $table, $id, $blog), ARRAY_A);
     if (!$row) {
-        return new WP_Error('not_found', 'Annotation introuvable.', ['status' => 404]);
+        return new WP_Error('not_found', __('Annotation not found.', 'coquille-revue'), ['status' => 404]);
     }
 
     // La date d'application n'est posée qu'une fois : sur un double clic ou deux appels simultanés,
@@ -793,12 +854,17 @@ add_action('coquille_revue_send_digest', function () {
     update_option('coquille_revue_digest_last_id', max($last, $max), false);
     if ($count === 0) return;
 
+    // Dans la langue du site, quelle que soit celle de la personne dont la visite a déclenché l'envoi.
+    $switched  = switch_to_locale(get_locale());
     $site_name = wp_specialchars_decode(get_bloginfo('name'), ENT_QUOTES);
     wp_mail(
         get_option('admin_email'),
-        sprintf('[Coquille Revue] %d nouvelle(s) annotation(s) sur %s', $count, $site_name),
-        sprintf("%d nouvelle(s) annotation(s) à relire.\n\n%s", $count, admin_url('admin.php?page=coquille-revue'))
+        /* translators: 1: number of new annotations, 2: site name */
+        sprintf(_n('[Coquille Revue] %1$d new annotation on %2$s', '[Coquille Revue] %1$d new annotations on %2$s', $count, 'coquille-revue'), $count, $site_name),
+        /* translators: %d: number of new annotations */
+        sprintf(_n('%d new annotation to review.', '%d new annotations to review.', $count, 'coquille-revue'), $count) . "\n\n" . admin_url('admin.php?page=coquille-revue')
     );
+    if ($switched) restore_previous_locale();
 });
 
 // Remerciement au contributeur quand son annotation passe à « applied ».
@@ -825,16 +891,19 @@ function coquille_revue_notify_contributor($row) {
     $site_name = wp_specialchars_decode(get_bloginfo('name'), ENT_QUOTES);
     $date      = (string) mysql2date(get_option('date_format'), $row['created_at']);
 
-    $body  = "Bonjour,\n\n";
-    $body .= "La suggestion que vous avez laissée le {$date} sur le site « {$site_name} » a été appliquée. Merci pour votre relecture, c'est précieux.\n\n";
+    $body  = __('Hello,', 'coquille-revue') . "\n\n";
+    /* translators: 1: date of the suggestion, 2: site name */
+    $body .= sprintf(__('The suggestion you left on %1$s on the site “%2$s” has been applied. Thank you for your review, it really helps.', 'coquille-revue'), $date, $site_name) . "\n\n";
     $body .= home_url('/') . "\n\n";
-    $body .= "Si vous n'êtes pas à l'origine de cette suggestion, ignorez ce message.\n\n";
-    $body .= "L'équipe de {$site_name}";
+    $body .= __('If you did not make this suggestion, please ignore this message.', 'coquille-revue') . "\n\n";
+    /* translators: %s: site name */
+    $body .= sprintf(__('The %s team', 'coquille-revue'), $site_name);
 
     // Filtre pour personnaliser l'e-mail depuis le thème ($row contient le texte saisi par le visiteur : à ne pas recopier tel quel).
     $mail = apply_filters('coquille_revue_contributor_email', [
         'to'      => $to,
-        'subject' => sprintf('[%s] Votre suggestion a été appliquée — merci !', $site_name),
+        /* translators: %s: site name */
+        'subject' => sprintf(__('[%s] Your suggestion has been applied, thank you!', 'coquille-revue'), $site_name),
         'message' => $body,
         'headers' => ['Content-Type: text/plain; charset=UTF-8'],
     ], $row);
@@ -850,17 +919,26 @@ function coquille_revue_notify_contributor($row) {
 
 add_action('admin_init', function () {
     if (!function_exists('wp_add_privacy_policy_content')) return;
+    $days   = COQUILLE_REVUE_IP_RETENTION_DAYS;
     $months = (int) round(COQUILLE_REVUE_EMAIL_RETENTION_DAYS / 30.5);
+    /* translators: %d: number of days */
+    $ip = sprintf(_n('The IP address is used to limit spam and is deleted after %d day.', 'The IP address is used to limit spam and is deleted after %d days.', $days, 'coquille-revue'), $days);
     if (coquille_revue_thanks_enabled()) {
-        $text = "<p>Quand un visiteur propose une correction avec l'outil de relecture Coquille Revue, nous enregistrons le texte concerné et sa suggestion, l'adresse de la page, son nom et son adresse e-mail s'il les indique (facultatifs), ainsi que son adresse IP.</p>"
-            . "<p>Le texte, la suggestion et le nom sont visibles par les éditeurs et les administrateurs du site ; l'e-mail et l'adresse IP par les administrateurs seulement. Pour appliquer les corrections, le texte, la suggestion et le nom peuvent être transmis à un assistant d'intelligence artificielle (par exemple Claude, d'Anthropic) ; l'e-mail et l'adresse IP ne le sont jamais.</p>"
-            . "<p>L'adresse IP sert à limiter le spam et est effacée au bout de %d jours. L'e-mail sert uniquement à prévenir la personne quand sa suggestion est appliquée : il est effacé, avec le nom, dès que la suggestion est traitée, et au plus tard au bout de %d mois.</p>";
+        $paragraphs = [
+            __('When a visitor suggests a correction with the Coquille Revue proofreading tool, we store the text concerned and the suggestion, the page address, their name and email address if they give them (optional), and their IP address.', 'coquille-revue'),
+            __('The text, the suggestion and the name are visible to the editors and administrators of the site; the email and the IP address to administrators only. To apply the corrections, the text, the suggestion and the name may be sent to an artificial intelligence assistant (for example Claude, by Anthropic); the email and the IP address never are.', 'coquille-revue'),
+            /* translators: %d: number of months */
+            $ip . ' ' . sprintf(_n('The email is only used to let the person know when their suggestion is applied: it is deleted, along with the name, within a day after the suggestion is processed, and after %d month at the latest.', 'The email is only used to let the person know when their suggestion is applied: it is deleted, along with the name, within a day after the suggestion is processed, and after %d months at the latest.', $months, 'coquille-revue'), $months),
+        ];
     } else {
-        $text = "<p>Quand un visiteur propose une correction avec l'outil de relecture Coquille Revue, nous enregistrons le texte concerné et sa suggestion, l'adresse de la page, son nom s'il l'indique (facultatif), ainsi que son adresse IP.</p>"
-            . "<p>Le texte, la suggestion et le nom sont visibles par les éditeurs et les administrateurs du site ; l'adresse IP par les administrateurs seulement. Pour appliquer les corrections, le texte, la suggestion et le nom peuvent être transmis à un assistant d'intelligence artificielle (par exemple Claude, d'Anthropic) ; l'adresse IP ne l'est jamais.</p>"
-            . "<p>L'adresse IP sert à limiter le spam et est effacée au bout de %d jours. Le nom est effacé dès que la suggestion est traitée, et au plus tard au bout de %d mois.</p>";
+        $paragraphs = [
+            __('When a visitor suggests a correction with the Coquille Revue proofreading tool, we store the text concerned and the suggestion, the page address, their name if they give it (optional), and their IP address.', 'coquille-revue'),
+            __('The text, the suggestion and the name are visible to the editors and administrators of the site; the IP address to administrators only. To apply the corrections, the text, the suggestion and the name may be sent to an artificial intelligence assistant (for example Claude, by Anthropic); the IP address never is.', 'coquille-revue'),
+            /* translators: %d: number of months */
+            $ip . ' ' . sprintf(_n('The name is deleted within a day after the suggestion is processed, and after %d month at the latest.', 'The name is deleted within a day after the suggestion is processed, and after %d months at the latest.', $months, 'coquille-revue'), $months),
+        ];
     }
-    wp_add_privacy_policy_content('Coquille Revue', wp_kses_post(sprintf($text, COQUILLE_REVUE_IP_RETENTION_DAYS, $months)));
+    wp_add_privacy_policy_content('Coquille Revue', implode('', array_map(fn($p) => '<p>' . esc_html($p) . '</p>', $paragraphs)));
 });
 
 add_filter('wp_privacy_personal_data_exporters', function ($exporters) {
@@ -884,16 +962,16 @@ function coquille_revue_privacy_export($email, $page = 1) {
     foreach ($rows as $r) {
         $items[] = [
             'group_id'    => 'coquille-revue',
-            'group_label' => 'Suggestions de relecture',
+            'group_label' => __('Proofreading suggestions', 'coquille-revue'),
             'item_id'     => 'coquille-revue-' . $r['id'],
             'data'        => [
-                ['name' => 'Page', 'value' => $r['url']],
-                ['name' => "Texte d'origine", 'value' => $r['original_text']],
-                ['name' => 'Suggestion', 'value' => $r['suggestion']],
-                ['name' => 'Nom', 'value' => (string) $r['reviewer_name']],
-                ['name' => 'E-mail', 'value' => (string) $r['reviewer_email']],
-                ['name' => 'Adresse IP', 'value' => (string) $r['reviewer_ip']],
-                ['name' => 'Date', 'value' => $r['created_at']],
+                ['name' => __('Page', 'coquille-revue'), 'value' => $r['url']],
+                ['name' => __('Original text', 'coquille-revue'), 'value' => $r['original_text']],
+                ['name' => _x('Suggestion', 'proposed text', 'coquille-revue'), 'value' => $r['suggestion']],
+                ['name' => __('Name', 'coquille-revue'), 'value' => (string) $r['reviewer_name']],
+                ['name' => __('Email', 'coquille-revue'), 'value' => (string) $r['reviewer_email']],
+                ['name' => __('IP address', 'coquille-revue'), 'value' => (string) $r['reviewer_ip']],
+                ['name' => __('Date', 'coquille-revue'), 'value' => $r['created_at']],
             ],
         ];
     }
@@ -911,7 +989,7 @@ function coquille_revue_privacy_erase($email, $page = 1) {
     return [
         'items_removed'  => (int) $count,
         'items_retained' => $count > 0,
-        'messages'       => $count > 0 ? ['Coquille Revue : le texte des suggestions est conservé, sans plus aucun lien avec la personne.'] : [],
+        'messages'       => $count > 0 ? [__('Coquille Revue: the text of the suggestions is kept, with no link to the person anymore.', 'coquille-revue')] : [],
         'done'           => true,
     ];
 }
@@ -940,7 +1018,7 @@ function coquille_revue_query_page($name) {
 }
 
 function coquille_revue_handle_change_status() {
-    if (!coquille_revue_can_manage()) wp_die('Forbidden', 403);
+    if (!coquille_revue_can_manage()) wp_die(esc_html__('Sorry, you are not allowed to do this.', 'coquille-revue'), 403);
     check_admin_referer('coquille_revue_change_status');
 
     $id     = isset($_GET['id']) && is_string($_GET['id']) ? absint(wp_unslash($_GET['id'])) : 0;
@@ -958,7 +1036,7 @@ function coquille_revue_handle_change_status() {
 
 // Réglages propres à ce site : remerciement des contributeurs et crédit public.
 function coquille_revue_handle_save_settings() {
-    if (!current_user_can('manage_options')) wp_die('Forbidden', 403);
+    if (!current_user_can('manage_options')) wp_die(esc_html__('Sorry, you are not allowed to do this.', 'coquille-revue'), 403);
     check_admin_referer('coquille_revue_save_settings');
 
     update_option('coquille_revue_thank_contributors', empty($_POST['coquille_revue_thank_contributors']) ? 0 : 1);
@@ -971,7 +1049,7 @@ function coquille_revue_handle_save_settings() {
 }
 
 function coquille_revue_handle_toggle_public() {
-    if (!coquille_revue_can_toggle_mode()) wp_die('Forbidden', 403);
+    if (!coquille_revue_can_toggle_mode()) wp_die(esc_html__('Sorry, you are not allowed to do this.', 'coquille-revue'), 403);
     check_admin_referer('coquille_revue_toggle_public');
 
     if (coquille_revue_login_mode_is_locked()) {
@@ -994,7 +1072,7 @@ function coquille_revue_handle_toggle_public() {
 }
 
 function coquille_revue_handle_reset() {
-    if (!current_user_can('manage_options')) wp_die('Forbidden', 403);
+    if (!current_user_can('manage_options')) wp_die(esc_html__('Sorry, you are not allowed to do this.', 'coquille-revue'), 403);
     check_admin_referer('coquille_revue_reset');
 
     // Seul le formulaire de la page d'admin, case de confirmation cochée, supprime : un lien, même avec un jeton valide, ne fait rien.
@@ -1013,7 +1091,7 @@ function coquille_revue_handle_reset() {
 }
 
 function coquille_revue_handle_export() {
-    if (!coquille_revue_can_manage()) wp_die('Forbidden', 403);
+    if (!coquille_revue_can_manage()) wp_die(esc_html__('Sorry, you are not allowed to do this.', 'coquille-revue'), 403);
     check_admin_referer('coquille_revue_export');
 
     $format = coquille_revue_query_choice('format', ['csv', 'json', 'md'], 'csv');
@@ -1041,14 +1119,17 @@ function coquille_revue_handle_export() {
             header('Content-Disposition: attachment; filename="' . $filename . '.csv"');
             echo "\xEF\xBB\xBF";
             $out = fopen('php://output', 'w');
-            coquille_revue_csv_line($out, ['ID','URL','Page','Mode','Type','Texte original','Suggestion','XPath','Auteur','IP','Statut','Date']);
+            coquille_revue_csv_line($out, [
+                'ID', 'URL', __('Page', 'coquille-revue'), __('Mode', 'coquille-revue'), __('Type', 'coquille-revue'), __('Original text', 'coquille-revue'),
+                _x('Suggestion', 'proposed text', 'coquille-revue'), 'XPath', __('Author', 'coquille-revue'), 'IP', __('Status', 'coquille-revue'), __('Date', 'coquille-revue'),
+            ]);
             foreach (coquille_revue_row_batches($status, true) as $rows) { // e-mail et IP : seulement dans le CSV, pour un administrateur
                 foreach ($rows as $r) {
                     coquille_revue_csv_line($out, [
                         $r['id'], $r['url'], $r['page_title'],
                         $r['annotation_mode'] ?? 'text', $r['type'],
                         $r['original_text'], $r['suggestion'], $r['xpath'],
-                        $r['author_name'], $r['reviewer_ip'] ?? '',
+                        coquille_revue_author_label($r), $r['reviewer_ip'] ?? '',
                         $r['status'], $r['created_at']
                     ]);
                 }
@@ -1202,6 +1283,12 @@ function coquille_revue_annotation_source($row) {
     return ((int) ($row['author_id'] ?? 0)) > 0 ? 'logged_in_user' : 'anonymous_unverified';
 }
 
+// Nom de l'auteur pour l'affichage (page d'admin, CSV) : un visiteur sans nom est enregistré avec un nom vide.
+function coquille_revue_author_label($row) {
+    $name = (string) ($row['author_name'] ?? '');
+    return $name !== '' ? $name : __('Anonymous', 'coquille-revue');
+}
+
 // Export Markdown d'une liste d'annotations (kit de test d'injection) ; l'export du bouton d'admin passe par
 // coquille_revue_output_markdown(), qui écrit les mêmes morceaux lot par lot.
 function coquille_revue_format_markdown($rows, $status) {
@@ -1226,10 +1313,18 @@ function coquille_revue_output_markdown($status) {
     }
 }
 
+// Ligne traduite du Markdown (titres pour la personne qui lit le fichier) : ramenée à une seule ligne,
+// pour qu'une traduction ne puisse pas y ajouter de titre, de bloc ou de consigne sur une ligne à part.
+function coquille_revue_markdown_line($text) {
+    return trim((string) preg_replace('/\s+/u', ' ', (string) $text));
+}
+
 function coquille_revue_markdown_head($status, $count) {
     $date  = current_time('Y-m-d H:i');
-    $md  = "# Coquille Revue — `{$status}` export\n\n";
-    $md .= "_Generated on {$date} — {$count} annotation(s) · " . home_url() . "_\n\n";
+    /* translators: %s: status of the exported annotations, as a code (pending, applied…) */
+    $md  = '# ' . coquille_revue_markdown_line(sprintf(__('Coquille Revue — %s export', 'coquille-revue'), "`{$status}`")) . "\n\n";
+    /* translators: 1: date and time of the export, 2: number of annotations, 3: site address */
+    $md .= '_' . coquille_revue_markdown_line(sprintf(_n('Generated on %1$s — %2$d annotation · %3$s', 'Generated on %1$s — %2$d annotations · %3$s', $count, 'coquille-revue'), $date, $count, home_url())) . "_\n\n";
 
     // Consignes pour Claude Code : anglais fixe, jamais traduit.
     $md .= "## Instructions for Claude Code\n\n";
@@ -1240,7 +1335,7 @@ function coquille_revue_markdown_head($status, $count) {
     $md .= "\n";
 
     if ($count === 0) {
-        return $md . "---\n\n_No annotation with this status._\n";
+        return $md . "---\n\n_" . coquille_revue_markdown_line(__('No annotations with this status.', 'coquille-revue')) . "_\n";
     }
 
     // Tout ce qui vient des visiteurs est enfermé dans un bloc de code :
@@ -1279,7 +1374,9 @@ function coquille_revue_markdown_row($r) {
 }
 
 function coquille_revue_markdown_footer() {
-    return "\n---\n\n_Coquille Revue plugin · by " . COQUILLE_REVUE_AUTHOR . " — " . COQUILLE_REVUE_AUTHOR_URL . "_\n";
+    /* translators: 1: plugin name, 2: author name, linked to the author's website */
+    $credit = sprintf(__('%1$s plugin · by %2$s', 'coquille-revue'), 'Coquille Revue', COQUILLE_REVUE_AUTHOR);
+    return "\n---\n\n_" . coquille_revue_markdown_line($credit) . ' — ' . COQUILLE_REVUE_AUTHOR_URL . "_\n";
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1740,24 +1837,32 @@ add_action('admin_enqueue_scripts', function ($hook_suffix) {
 
 // $will_notify : le passage à « applied » enverra un remerciement, on demande donc confirmation avant.
 function coquille_revue_render_row_actions($id, $current_status, $return_status, $return_paged, $will_notify) {
+    $to = [
+        'pending'     => _x('Pending', 'set the status', 'coquille-revue'),
+        'in_progress' => _x('In progress', 'set the status', 'coquille-revue'),
+        'applied'     => _x('Applied', 'set the status', 'coquille-revue'),
+        'rejected'    => _x('Rejected', 'set the status', 'coquille-revue'),
+        'archived'    => _x('Archive', 'set the status', 'coquille-revue'),
+    ];
     $transitions = [
-        'pending'     => ['in_progress' => 'En cours', 'applied' => 'Appliqué', 'rejected' => 'Rejeté', 'archived' => 'Archiver'],
-        'in_progress' => ['applied' => 'Appliqué', 'rejected' => 'Rejeté', 'pending' => 'En attente', 'archived' => 'Archiver'],
-        'applied'     => ['pending' => 'En attente', 'archived' => 'Archiver'],
-        'rejected'    => ['pending' => 'En attente', 'archived' => 'Archiver'],
-        'archived'    => ['pending' => 'Restaurer'],
+        'pending'     => ['in_progress', 'applied', 'rejected', 'archived'],
+        'in_progress' => ['applied', 'rejected', 'pending', 'archived'],
+        'applied'     => ['pending', 'archived'],
+        'rejected'    => ['pending', 'archived'],
+        'archived'    => ['pending'],
     ];
 
     echo '<div class="coquille-revue-actions">';
-    foreach ($transitions[$current_status] ?? [] as $new_status => $label) {
-        $url = wp_nonce_url(
+    foreach ($transitions[$current_status] ?? [] as $new_status) {
+        $label = $current_status === 'archived' ? _x('Restore', 'set the status back to pending', 'coquille-revue') : $to[$new_status];
+        $url   = wp_nonce_url(
             add_query_arg(
                 ['action' => 'coquille_revue_change_status', 'id' => $id, 'new_status' => $new_status, 'return_status' => $return_status, 'return_paged' => $return_paged],
                 admin_url('admin-post.php')
             ),
             'coquille_revue_change_status'
         );
-        $confirm = $new_status === 'applied' && $will_notify ? 'Un e-mail de remerciement va être envoyé au contributeur. Continuer ?' : '';
+        $confirm = $new_status === 'applied' && $will_notify ? __('A thank-you email will be sent to the contributor. Continue?', 'coquille-revue') : '';
         printf(
             '<a href="%s" class="button button-small coquille-status--%s"%s>%s</a>',
             esc_url($url),
@@ -1780,23 +1885,40 @@ function coquille_revue_admin_page() {
         'personal' => true,
     ]);
 
-    $labels = ['pending' => 'En attente', 'in_progress' => 'En cours', 'applied' => 'Appliqué', 'rejected' => 'Rejeté', 'archived' => 'Archivé'];
+    $labels = [
+        'pending'     => _x('Pending', 'annotation status', 'coquille-revue'),
+        'in_progress' => _x('In progress', 'annotation status', 'coquille-revue'),
+        'applied'     => _x('Applied', 'annotation status', 'coquille-revue'),
+        'rejected'    => _x('Rejected', 'annotation status', 'coquille-revue'),
+        'archived'    => _x('Archived', 'annotation status', 'coquille-revue'),
+    ];
+    $types  = coquille_revue_type_labels();
+    $alert_labels = [
+        'web_address'              => __('web address', 'coquille-revue'),
+        'code_or_command'          => __('code or command', 'coquille-revue'),
+        'invisible_characters'     => __('invisible characters', 'coquille-revue'),
+        'mixed_scripts'            => __('mixed alphabets', 'coquille-revue'),
+        'instruction_or_authority' => __('instruction or authority', 'coquille-revue'),
+    ];
+    /* translators: date and time format of the annotation table, see https://www.php.net/manual/datetime.format.php */
+    $date_format = _x('Y/m/d g:i a', 'annotation table date format', 'coquille-revue');
     $cut    = fn($text, $length) => mb_substr((string) $text, 0, $length) . (mb_strlen((string) $text) > $length ? '…' : '');
 
     echo '<div class="wrap coquille-revue-admin">';
     printf('<h1>Coquille Revue <span class="coquille-revue-version">v%s</span></h1>', esc_html(COQUILLE_REVUE_VERSION));
 
-    // Messages flash
+    // Messages flash : texte déjà échappé, seules les balises code et strong ajoutées ici passent.
     $flash_map = [
-        'reset_done'        => ['success', 'Toutes les annotations de ce site ont été supprimées.'],
-        'reset_unconfirmed' => ['error',   'Rien n\'a été supprimé : cochez la case de confirmation à côté du bouton « Tout supprimer ».'],
-        'now_public'        => ['success', 'Mode <strong>public</strong> activé — n\'importe quel visiteur peut désormais annoter.'],
-        'now_private'       => ['success', 'Mode <strong>privé</strong> activé — seuls les utilisateurs connectés (contributeurs et plus) peuvent annoter.'],
-        'mode_locked'       => ['error',   'Le mode est verrouillé par <code>COQUILLE_REVUE_REQUIRE_LOGIN</code> dans <code>wp-config.php</code>. Supprimez la constante pour pouvoir basculer depuis cette page.'],
-        'status_changed'    => ['success', 'Statut mis à jour.'],
-        'status_invalid'    => ['error',   'Statut invalide.'],
-        'status_notfound'   => ['error',   'Annotation introuvable.'],
-        'settings_saved'    => ['success', 'Réglages enregistrés.'],
+        'reset_done'        => ['success', esc_html__('All annotations of this site have been deleted.', 'coquille-revue')],
+        'reset_unconfirmed' => ['error',   esc_html__('Nothing was deleted: tick the confirmation box next to the “Delete all” button.', 'coquille-revue')],
+        'now_public'        => ['success', esc_html__('Public mode is on: any visitor can now annotate.', 'coquille-revue')],
+        'now_private'       => ['success', esc_html__('Private mode is on: only logged-in users (contributors and above) can annotate.', 'coquille-revue')],
+        /* translators: 1: name of the constant, 2: name of the configuration file */
+        'mode_locked'       => ['error',   sprintf(esc_html__('The mode is locked by %1$s in %2$s. Remove the constant to switch it from this page.', 'coquille-revue'), '<code>COQUILLE_REVUE_REQUIRE_LOGIN</code>', '<code>wp-config.php</code>')],
+        'status_changed'    => ['success', esc_html__('Status updated.', 'coquille-revue')],
+        'status_invalid'    => ['error',   esc_html__('Invalid status.', 'coquille-revue')],
+        'status_notfound'   => ['error',   esc_html__('Annotation not found.', 'coquille-revue')],
+        'settings_saved'    => ['success', esc_html__('Settings saved.', 'coquille-revue')],
     ];
     $msg = coquille_revue_query_choice('coquille_revue_msg', array_keys($flash_map), '');
     if ($msg !== '') {
@@ -1808,10 +1930,16 @@ function coquille_revue_admin_page() {
     $is_private = coquille_revue_is_login_required();
     printf('<div class="notice inline coquille-revue-mode %s"><p>', esc_attr($is_private ? 'notice-info' : 'notice-warning'));
     if ($is_private) {
-        echo '<span class="dashicons dashicons-lock" aria-hidden="true"></span> <strong>Mode privé</strong> — seuls les utilisateurs connectés (contributeurs et plus) peuvent annoter.';
+        printf(
+            /* translators: %s: "Private mode", in bold */
+            esc_html__('%s — only logged-in users (contributors and above) can annotate.', 'coquille-revue'),
+            '<span class="dashicons dashicons-lock" aria-hidden="true"></span> <strong>' . esc_html__('Private mode', 'coquille-revue') . '</strong>'
+        );
     } else {
         printf(
-            '<span class="dashicons dashicons-admin-site-alt3" aria-hidden="true"></span> <strong>Mode public</strong> — n\'importe quel visiteur peut annoter (par adresse IP, au plus %1$d envois en %2$d min et %3$d par heure ; %4$d envois anonymes par heure pour le site ; champ piège anti-robots).',
+            /* translators: 1: "Public mode", in bold, 2: submissions per IP address, 3: number of minutes, 4: submissions per IP address and per hour, 5: anonymous submissions per hour for the site */
+            esc_html__('%1$s — any visitor can annotate (per IP address, at most %2$d submissions in %3$d minutes and %4$d per hour; %5$d anonymous submissions per hour for the site; honeypot field against bots).', 'coquille-revue'),
+            '<span class="dashicons dashicons-admin-site-alt3" aria-hidden="true"></span> <strong>' . esc_html__('Public mode', 'coquille-revue') . '</strong>',
             (int) COQUILLE_REVUE_RATE_LIMIT_PER_IP,
             (int) (COQUILLE_REVUE_RATE_LIMIT_WINDOW / 60),
             (int) COQUILLE_REVUE_RATE_LIMIT_PER_IP_HOUR,
@@ -1820,15 +1948,19 @@ function coquille_revue_admin_page() {
     }
     echo '</p>';
     if (coquille_revue_login_mode_is_locked()) {
-        echo '<span class="coquille-revue-muted">Verrouillé par <code>wp-config.php</code></span>';
+        printf(
+            /* translators: %s: name of the configuration file */
+            '<span class="coquille-revue-muted">' . esc_html__('Locked by %s', 'coquille-revue') . '</span>',
+            '<code>wp-config.php</code>'
+        );
     } elseif (!coquille_revue_can_toggle_mode()) {
-        echo '<span class="coquille-revue-muted">Réglé par l\'administrateur du réseau</span>';
+        echo '<span class="coquille-revue-muted">' . esc_html__('Set by the network administrator', 'coquille-revue') . '</span>';
     } else {
         printf(
             '<a class="button%s" href="%s">%s</a>',
             $is_private ? ' button-primary' : '',
             esc_url(wp_nonce_url(admin_url('admin-post.php?action=coquille_revue_toggle_public'), 'coquille_revue_toggle_public')),
-            esc_html($is_private ? 'Passer en mode public' : 'Passer en mode privé')
+            $is_private ? esc_html__('Switch to public mode', 'coquille-revue') : esc_html__('Switch to private mode', 'coquille-revue')
         );
     }
     echo '</div>';
@@ -1838,27 +1970,40 @@ function coquille_revue_admin_page() {
         printf('<form method="post" action="%s" class="coquille-revue-settings">', esc_url(admin_url('admin-post.php')));
         echo '<input type="hidden" name="action" value="coquille_revue_save_settings">';
         wp_nonce_field('coquille_revue_save_settings');
-        echo '<fieldset><legend class="screen-reader-text">Réglages de ce site</legend>';
+        echo '<fieldset><legend class="screen-reader-text">' . esc_html__('Settings for this site', 'coquille-revue') . '</legend>';
         printf(
-            '<label><input type="checkbox" name="coquille_revue_thank_contributors" value="1"%s> <strong>E-mail de remerciement</strong> : demander leur e-mail (facultatif) aux visiteurs et prévenir le contributeur quand sa suggestion est appliquée (au plus %d e-mails par jour, un seul par adresse).</label>',
+            '<label><input type="checkbox" name="coquille_revue_thank_contributors" value="1"%1$s> %2$s</label>',
             checked(coquille_revue_thanks_enabled(), true, false),
-            (int) COQUILLE_REVUE_THANKS_PER_SITE
+            sprintf(
+                /* translators: 1: "Thank-you email", in bold, 2: maximum number of emails per day */
+                esc_html__('%1$s: ask visitors for their email (optional) and let contributors know when their suggestion is applied (at most %2$d emails per day, one per address).', 'coquille-revue'),
+                '<strong>' . esc_html__('Thank-you email', 'coquille-revue') . '</strong>',
+                (int) COQUILLE_REVUE_THANKS_PER_SITE
+            )
         );
         printf(
-            '<label><input type="checkbox" name="coquille_revue_show_credit" value="1"%s> <strong>Crédit</strong> : afficher « Coquille Revue, proposé par %s » et un lien vers son site dans la fenêtre d\'information du crayon.</label>',
+            '<label><input type="checkbox" name="coquille_revue_show_credit" value="1"%1$s> %2$s</label>',
             checked(coquille_revue_show_credit(), true, false),
-            esc_html(COQUILLE_REVUE_AUTHOR)
+            sprintf(
+                /* translators: 1: "Credit", in bold, 2: author name */
+                esc_html__('%1$s: show “Coquille Revue, by %2$s” and a link to their website in the information popover of the pencil button.', 'coquille-revue'),
+                '<strong>' . esc_html__('Credit', 'coquille-revue') . '</strong>',
+                esc_html(COQUILLE_REVUE_AUTHOR)
+            )
         );
         echo '</fieldset>';
-        echo '<button type="submit" class="button">Enregistrer</button>';
+        echo '<button type="submit" class="button">' . esc_html__('Save', 'coquille-revue') . '</button>';
         echo '</form>';
     }
 
     // Encart Claude Code : la skill passe par WP-CLI, aucun mot de passe n'est à créer.
     echo '<div class="coquille-revue-claude">';
-    echo '<h2>Appliquer les corrections avec Claude Code</h2>';
-    echo '<p>Installe une fois le plugin Claude Code de Coquille Revue, puis lance <code>/coquille-revue:apply-review</code> dans le dossier du site. '
-        . 'Il passe par WP-CLI (en local ou par SSH) : aucun mot de passe à créer. Chaque correction t\'est montrée avant d\'être appliquée, et attend ton accord.</p>';
+    echo '<h2>' . esc_html__('Apply the corrections with Claude Code', 'coquille-revue') . '</h2>';
+    printf(
+        /* translators: %s: the Claude Code command */
+        '<p>' . esc_html__('Install the Coquille Revue plugin for Claude Code once, then run %s in the folder of the site. It works through WP-CLI (locally or over SSH): no password to create. Each correction is shown to you before it is applied, and waits for your approval.', 'coquille-revue') . '</p>',
+        '<code>/coquille-revue:apply-review</code>'
+    );
     printf(
         "<pre>claude plugin marketplace add Atelier-4F-digital/coquille-revue\nclaude plugin install coquille-revue@atelier-4f-digital\n/coquille-revue:apply-review --url=%s</pre>",
         esc_html(home_url('/'))
@@ -1870,11 +2015,11 @@ function coquille_revue_admin_page() {
     $last = array_key_last($counts);
     foreach ($counts as $s => $c) {
         printf(
-            '<li><a href="%s"%s>%s <span class="count">(%d)</span></a>%s</li>',
+            '<li><a href="%s"%s>%s <span class="count">(%s)</span></a>%s</li>',
             esc_url(add_query_arg(['status' => $s, 'paged' => false, 'coquille_revue_msg' => false])),
             $filter === $s ? ' class="current" aria-current="page"' : '',
             esc_html($labels[$s]),
-            (int) $c,
+            esc_html(number_format_i18n($c)),
             $s === $last ? '' : ' |'
         );
     }
@@ -1883,8 +2028,13 @@ function coquille_revue_admin_page() {
     // Exports, puis suppression de toutes les annotations : formulaire POST avec case obligatoire,
     // qui fonctionne sans JavaScript (et donc aussi sous une CSP stricte).
     echo '<div class="coquille-revue-toolbar">';
-    echo '<strong>Exporter cet onglet :</strong>';
-    foreach (['csv' => 'CSV (Excel)', 'json' => 'JSON (Claude Code)', 'md' => 'Markdown (relecture)'] as $format => $label) {
+    echo '<strong>' . esc_html__('Export this tab:', 'coquille-revue') . '</strong>';
+    $formats = [
+        'csv'  => __('CSV (spreadsheet)', 'coquille-revue'),
+        'json' => __('JSON (Claude Code)', 'coquille-revue'),
+        'md'   => __('Markdown (reading)', 'coquille-revue'),
+    ];
+    foreach ($formats as $format => $label) {
         printf(
             '<a class="button" href="%s"><span class="dashicons dashicons-download" aria-hidden="true"></span> %s</a>',
             esc_url(wp_nonce_url(add_query_arg(['action' => 'coquille_revue_export', 'status' => $filter, 'format' => $format], admin_url('admin-post.php')), 'coquille_revue_export')),
@@ -1896,22 +2046,32 @@ function coquille_revue_admin_page() {
         printf('<form method="post" action="%s" class="coquille-revue-reset">', esc_url(admin_url('admin-post.php')));
         echo '<input type="hidden" name="action" value="coquille_revue_reset">';
         wp_nonce_field('coquille_revue_reset');
-        printf('<label><input type="checkbox" name="coquille_revue_confirm_reset" value="1" required> Supprimer définitivement les %d annotation(s) de ce site (irréversible)</label>', (int) $total_all);
-        printf('<button type="submit" class="button coquille-revue-danger"><span class="dashicons dashicons-trash" aria-hidden="true"></span> Tout supprimer (%d)</button>', (int) $total_all);
+        printf(
+            /* translators: %s: number of annotations */
+            '<label><input type="checkbox" name="coquille_revue_confirm_reset" value="1" required> ' . esc_html(_n('Permanently delete the %s annotation of this site (cannot be undone)', 'Permanently delete the %s annotations of this site (cannot be undone)', $total_all, 'coquille-revue')) . '</label>',
+            esc_html(number_format_i18n($total_all))
+        );
+        printf(
+            /* translators: %s: number of annotations */
+            '<button type="submit" class="button coquille-revue-danger"><span class="dashicons dashicons-trash" aria-hidden="true"></span> ' . esc_html__('Delete all (%s)', 'coquille-revue') . '</button>',
+            esc_html(number_format_i18n($total_all))
+        );
         echo '</form>';
     }
     echo '</div>';
 
     printf(
-        '<div class="coquille-revue-endpoint"><strong>Endpoint API REST :</strong> %s</div>',
+        '<div class="coquille-revue-endpoint"><strong>%s</strong> %s</div>',
+        esc_html__('REST API endpoint:', 'coquille-revue'),
         esc_html(add_query_arg('status', $filter, rest_url('coquille-revue/v1/annotations')))
     );
 
     $pagination = '';
     if ($pages > 1) {
         $pagination = sprintf(
-            '<div class="tablenav"><div class="tablenav-pages"><span class="displaying-num">%d annotation(s)</span> <span class="pagination-links">%s</span></div></div>',
-            (int) $counts[$filter],
+            '<div class="tablenav"><div class="tablenav-pages"><span class="displaying-num">%s</span> <span class="pagination-links">%s</span></div></div>',
+            /* translators: %s: number of annotations */
+            esc_html(sprintf(_n('%s annotation', '%s annotations', $counts[$filter], 'coquille-revue'), number_format_i18n($counts[$filter]))),
             paginate_links([
                 'base'    => add_query_arg(['paged' => '%#%', 'coquille_revue_msg' => false]),
                 'format'  => '',
@@ -1922,19 +2082,31 @@ function coquille_revue_admin_page() {
     }
 
     if (empty($rows)) {
-        echo '<p>Aucune annotation avec ce statut.</p>';
+        echo '<p>' . esc_html__('No annotations with this status.', 'coquille-revue') . '</p>';
     } else {
         echo wp_kses_post($pagination);
         echo '<table class="wp-list-table widefat fixed striped coquille-revue-table"><thead><tr>';
-        foreach (['id' => 'ID', 'page' => 'Page', 'original' => 'Texte original', 'suggestion' => 'Suggestion', 'alerts' => 'Alertes', 'mode' => 'Mode',
-            'type' => 'Type', 'author' => 'Auteur', 'status' => 'Statut', 'date' => 'Date', 'actions' => 'Actions'] as $col => $title) {
+        $columns = [
+            'id'         => __('ID', 'coquille-revue'),
+            'page'       => __('Page', 'coquille-revue'),
+            'original'   => __('Original text', 'coquille-revue'),
+            'suggestion' => _x('Suggestion', 'proposed text', 'coquille-revue'),
+            'alerts'     => __('Alerts', 'coquille-revue'),
+            'mode'       => __('Mode', 'coquille-revue'),
+            'type'       => __('Type', 'coquille-revue'),
+            'author'     => __('Author', 'coquille-revue'),
+            'status'     => __('Status', 'coquille-revue'),
+            'date'       => __('Date', 'coquille-revue'),
+            'actions'    => __('Actions', 'coquille-revue'),
+        ];
+        foreach ($columns as $col => $title) {
             printf('<th scope="col" class="coquille-col-%s">%s</th>', esc_attr($col), esc_html($title));
         }
         echo '</tr></thead><tbody>';
 
         foreach ($rows as $row) {
             $mode   = ($row['annotation_mode'] ?? 'text') === 'zone' ? 'zone' : 'text';
-            $alerts = coquille_revue_annotation_alerts($row); // les mêmes que dans les exports : à voir avant de cliquer sur « Appliqué »
+            $alerts = coquille_revue_annotation_alerts($row, $alert_labels); // les mêmes que dans les exports : à voir avant de cliquer sur « Appliqué »
 
             echo '<tr>';
             printf('<td>%d</td>', (int) $row['id']);
@@ -1951,18 +2123,22 @@ function coquille_revue_admin_page() {
             } else {
                 echo '<td><span class="coquille-revue-muted">—</span></td>';
             }
-            printf('<td><span class="coquille-pill coquille-pill--%s">%s</span></td>', esc_attr($mode), esc_html($mode === 'zone' ? 'zone' : 'texte'));
-            printf('<td><em>%s</em></td>', esc_html($row['type']));
-            echo '<td>' . esc_html($row['author_name']);
+            printf(
+                '<td><span class="coquille-pill coquille-pill--%s">%s</span></td>',
+                esc_attr($mode),
+                $mode === 'zone' ? esc_html_x('area', 'annotation mode', 'coquille-revue') : esc_html_x('text', 'annotation mode', 'coquille-revue')
+            );
+            printf('<td><em>%s</em></td>', esc_html($types[$row['type']] ?? $row['type']));
+            echo '<td>' . esc_html(coquille_revue_author_label($row));
             if ((int) $row['author_id'] === 0) {
-                echo ' <em class="coquille-revue-muted">(anonyme)</em>';
+                echo ' <em class="coquille-revue-muted">(' . esc_html__('not logged in', 'coquille-revue') . ')</em>';
                 if (!empty($row['reviewer_ip'])) {
                     printf('<br><code class="coquille-revue-ip">%s</code>', esc_html($row['reviewer_ip']));
                 }
             }
             echo '</td>';
             printf('<td><span class="coquille-status coquille-status--%s">%s</span></td>', esc_attr($row['status']), esc_html($labels[$row['status']] ?? $row['status']));
-            printf('<td class="coquille-revue-muted">%s</td>', esc_html(mysql2date('d/m/y H:i', $row['created_at'])));
+            printf('<td class="coquille-revue-muted">%s</td>', esc_html(mysql2date($date_format, $row['created_at'])));
             echo '<td>';
             coquille_revue_render_row_actions((int) $row['id'], $row['status'], $filter, $paged, !empty($row['will_notify']));
             echo '</td></tr>';
@@ -1974,10 +2150,13 @@ function coquille_revue_admin_page() {
 
     // Crédit en pied de page
     printf(
-        '<p class="coquille-revue-credit">Plugin <strong>Coquille Revue v%s</strong> · proposé par <a href="%s" target="_blank" rel="noopener noreferrer">%s <span aria-hidden="true">↗</span></a></p>',
-        esc_html(COQUILLE_REVUE_VERSION),
-        esc_url(COQUILLE_REVUE_AUTHOR_URL),
-        esc_html(COQUILLE_REVUE_AUTHOR)
+        '<p class="coquille-revue-credit">%s</p>',
+        sprintf(
+            /* translators: 1: plugin name, 2: author name, linked to the author's website */
+            esc_html__('%1$s plugin · by %2$s', 'coquille-revue'),
+            '<strong>Coquille Revue v' . esc_html(COQUILLE_REVUE_VERSION) . '</strong>',
+            '<a href="' . esc_url(COQUILLE_REVUE_AUTHOR_URL) . '" target="_blank" rel="noopener noreferrer">' . esc_html(COQUILLE_REVUE_AUTHOR) . ' <span aria-hidden="true">↗</span></a>'
+        )
     );
     echo '</div>';
 }
