@@ -9,15 +9,70 @@ Ouvrez un ticket (Issue) en précisant : la version de l'extension, de WordPress
 ## Proposer une modification
 
 1. Créez une branche à partir de `main`.
-2. Faites une modification ciblée, testée sur un WordPress local (idéalement aussi en multisite).
-3. Décrivez le changement dans [CHANGELOG.md](CHANGELOG.md), section de la version en cours.
-4. Ouvrez une demande de fusion (Pull Request) qui explique le pourquoi du changement.
+2. Faites une modification ciblée, testée sur un WordPress local (idéalement aussi en multisite). Elle doit passer PHPCS et les tests PHPUnit, en simple site et en multisite (voir plus bas).
+3. Décrivez le changement dans [CHANGELOG.md](CHANGELOG.md), en anglais, section de la version en cours.
+4. Ouvrez une demande de fusion (Pull Request) qui explique le pourquoi du changement. L'intégration continue rejoue toutes les vérifications.
 
 ## Environnement de développement
 
 - Un WordPress local (Local, wp-env, Docker…) avec [WP-CLI](https://wp-cli.org/), en simple site et en multisite en sous-répertoires.
-- Le zip de l'extension se construit avec `bash bin/build-zip.sh` (à partir du dernier commit).
+- PHP 7.4 ou plus et [Composer](https://getcomposer.org/). `composer install` installe les outils de développement dans `vendor/` : PHPCS avec les WordPress Coding Standards et PHPCompatibilityWP, PHPUnit et ses polyfills. Ils ne sont jamais livrés avec l'extension. Le `composer.lock` est résolu pour PHP 7.4 (`config.platform`) : il sert tel quel de PHP 7.4 à 8.4.
+- Le zip de l'extension se construit avec `bash bin/build-zip.sh` (à partir du dernier commit). Il ne contient que `coquille-revue.php`, `uninstall.php`, `readme.txt`, `LICENSE`, `assets/` et `languages/` : tout le reste est marqué `export-ignore` dans `.gitattributes` (et listé dans `.distignore`).
 - Le plugin Claude Code se vérifie avec `claude plugin validate ./claude-plugin` et `claude plugin validate .`, et se teste localement avec `claude --plugin-dir ./claude-plugin`.
+
+### Standards de code (PHPCS)
+
+```bash
+vendor/bin/phpcs
+```
+
+Les règles sont dans `phpcs.xml.dist` (étape 1) : sécurité, base de données et API WordPress des WordPress Coding Standards 3, préfixe `coquille_revue`, domaine de traduction `coquille-revue`, WordPress 6.2 minimum (« Requires at least »), compatibilité PHP 7.4 et plus. Attendu : 0 erreur et 0 avertissement. Une exception se justifie sur la ligne même : `// phpcs:ignore Nom.De.La.Regle -- raison`. La mise en forme complète des WordPress Coding Standards (étape 2) viendra dans un commit de reformatage à part.
+
+### Tests PHPUnit
+
+Les tests d'intégration de `tests/phpunit/` tournent dans la suite de tests de WordPress : API REST (droits, champ piège, limites d'envoi, validation des champs, statuts), données personnelles (export, effacement, purge), CSV, e-mail de remerciement, alertes en français et en anglais, export Markdown, et cloisonnement des sites en multisite.
+
+> ⚠️ La suite de tests efface et recrée les tables WordPress de sa base à chaque lancement : utilisez une base **dédiée**, jamais celle d'un site.
+
+Sous Linux ou macOS, avec MySQL ou MariaDB démarré :
+
+```bash
+mysqladmin -u root -p create wordpress_tests
+WP_INSTALL_TESTS_SKIP_UPDATE_CHECK=true bash bin/install-wp-tests.sh wordpress_tests root '<mot de passe>' 127.0.0.1 latest true
+vendor/bin/phpunit
+WP_MULTISITE=1 vendor/bin/phpunit
+```
+
+`bin/install-wp-tests.sh` (copie épinglée du modèle de WP-CLI, sans svn) télécharge WordPress et sa suite de tests dans le dossier temporaire (variables `WP_CORE_DIR` et `WP_TESTS_DIR`). Le dernier argument `true` saute la création de la base ; `latest` peut être remplacé par une version (`6.2`, `7.1.3`) ou par `trunk`.
+
+Sous Windows avec [Local](https://localwp.com/), depuis Git Bash et sans Docker :
+
+```bash
+COMPOSER_PHAR=~/bin/composer.phar bash bin/test-local.sh
+WP_MULTISITE=1 bash bin/test-local.sh
+bash bin/test-local.sh --filter Alerts
+```
+
+`bin/test-local.sh` utilise le PHP et le MySQL de Local : démarrez d'abord un site dans Local. Il crée la base dédiée `coquille_revue_tests`, télécharge WordPress (7.1.3 par défaut) et sa suite de tests dans `~/wp-tests`, puis lance PHPUnit avec les options passées. Réglages par variables : `DB_PORT` (port MySQL du site, à lire dans `%APPDATA%/Local/sites.json` ; 10022 par défaut), `WP_VERSION`, `WP_TESTS_BASE`, `LOCAL_PHP_DIR`, `LOCAL_MYSQL`, et `COMPOSER_PHAR` (seulement si `vendor/` manque).
+
+### Essayer dans WordPress Playground
+
+- **En ligne** : le lien « Try it in WordPress Playground » du README charge `wporg-assets/blueprints/blueprint.json`, qui installe la dernière release publiée (`releases/latest/download/coquille-revue.zip`), active le mode public et ouvre une page d'exemple. Ce dossier correspondra au dossier `assets/blueprints/` de WordPress.org.
+- **En local, avec le dossier de travail** (Node 20.10 ou plus), depuis la racine du dépôt :
+
+  ```bash
+  MSYS_NO_PATHCONV=1 npx --yes @wp-playground/cli@3.1.54 server --auto-mount --login
+  ```
+
+  Un WordPress jetable démarre sur http://127.0.0.1:9400 avec l'extension montée et activée ; arrêtez-le avec Ctrl+C. `MSYS_NO_PATHCONV=1` ne sert que sous Git Bash, qui réécrirait sinon les chemins `/wordpress/…`. La version 3.1.54 est épinglée parce que les suivantes demandent Node 24.18 ou plus.
+
+- **Tester une modification du blueprint** sans release : construisez le zip, copiez-le avec le blueprint dans un dossier hors du dépôt, remplacez dans la copie la ressource `url` par `{"resource": "bundled", "path": "/coquille-revue.zip"}`, puis lancez `npx --yes @wp-playground/cli@3.1.54 server --blueprint=./blueprint.json --blueprint-may-read-adjacent-files` dans ce dossier.
+
+### Intégration continue
+
+`.github/workflows/ci.yml` (GitHub Actions) tourne à chaque envoi sur `main` et à chaque Pull Request : syntaxe PHP de 7.4 à 8.4, PHPCS, validité des fichiers JSON, PHPUnit avec MySQL 8.4 (PHP 7.4 et WordPress 6.2, PHP 8.3 et WordPress 7.1, et WordPress 7.1 en multisite), et Plugin Check sur le contenu réel du zip (seules les erreurs bloquent). Les actions sont épinglées par SHA de commit, version en commentaire : pour en mettre une à jour, changez le SHA et le commentaire ensemble.
+
+Sur un tag `vX.Y.Z`, une fois tout au vert, le job `release` vérifie que le tag, l'en-tête `Version` et la constante `COQUILLE_REVUE_VERSION` sont identiques, puis crée une release **en brouillon** avec `coquille-revue-X.Y.Z.zip`, `coquille-revue.zip` (nom fixe, utilisé par le lien Playground) et la section du CHANGELOG. La publication reste manuelle ; une release qui existe déjà n'est jamais modifiée.
 
 ## Règles du code
 
@@ -54,4 +109,4 @@ En contribuant, vous acceptez que votre contribution soit publiée sous [GPL-2.0
 
 ---
 
-**English summary.** Issues and pull requests are welcome in English or French. Branch from `main`, keep changes focused and tested on a local WordPress (single site and multisite), update `CHANGELOG.md`, and explain the why in your pull request. Use the `coquille_revue_` prefix, scope every annotation query to `get_current_blog_id()`, sanitize input, escape output, check capabilities and nonces, never expose email or IP addresses to the API or the Claude Code exports, and keep the Claude Code rules consistent between `coquille_revue_claude_code_rules()` and `SKILL.md`. Interface texts are English source strings of the `coquille-revue` text domain, never called before `init` and escaped on output; the rules for Claude Code, alert codes, JSON keys and WP-CLI texts stay in fixed English and are never translatable. After changing a string, regenerate `languages/coquille-revue.pot`, update the `.po` files and compile them with `wp i18n make-mo` and `wp i18n make-php` (commands above). Contributions are licensed under GPL-2.0-or-later. Security issues: see [SECURITY.md](SECURITY.md).
+**English summary.** Issues and pull requests are welcome in English or French. Branch from `main`, keep changes focused and tested on a local WordPress (single site and multisite), update `CHANGELOG.md`, and explain the why in your pull request. Use the `coquille_revue_` prefix, scope every annotation query to `get_current_blog_id()`, sanitize input, escape output, check capabilities and nonces, never expose email or IP addresses to the API or the Claude Code exports, and keep the Claude Code rules consistent between `coquille_revue_claude_code_rules()` and `SKILL.md`. Interface texts are English source strings of the `coquille-revue` text domain, never called before `init` and escaped on output; the rules for Claude Code, alert codes, JSON keys and WP-CLI texts stay in fixed English and are never translatable. After changing a string, regenerate `languages/coquille-revue.pot`, update the `.po` files and compile them with `wp i18n make-mo` and `wp i18n make-php` (commands above). Development tools come from `composer install` (never shipped): run `vendor/bin/phpcs` (0 errors, 0 warnings) and the PHPUnit tests on a dedicated database (`bin/install-wp-tests.sh <db> <user> <pass> <host> latest true`, then `vendor/bin/phpunit` and `WP_MULTISITE=1 vendor/bin/phpunit`; on Windows with Local, `bin/test-local.sh`). Try your working copy with `npx --yes @wp-playground/cli@3.1.54 server --auto-mount --login`. GitHub Actions runs PHP lint (7.4 to 8.4), PHPCS, PHPUnit (single site and multisite) and Plugin Check on every push and pull request; a `vX.Y.Z` tag creates a draft release with the zips once everything passes. Contributions are licensed under GPL-2.0-or-later. Security issues: see [SECURITY.md](SECURITY.md).

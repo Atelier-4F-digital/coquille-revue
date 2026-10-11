@@ -35,6 +35,13 @@ All notable changes to Coquille Revue. Format based on [Keep a Changelog](https:
 - `coquille_revue_load_overlay` filter (boolean): return `false` to keep the review interface off a page.
 - Uninstall: deleting the plugin from the Plugins screen removes the annotations table, the settings and the scheduled tasks, on every site of the network (`uninstall.php`). Deactivating keeps everything.
 - `readme.txt` in English for the WordPress.org directory (description, privacy, FAQ, changelog).
+- **Try it in WordPress Playground** link in the README files: `wporg-assets/blueprints/blueprint.json` installs the latest release, turns on public mode and opens a sample page to review.
+- Releases also carry `coquille-revue.zip` (fixed name), so that `releases/latest/download/coquille-revue.zip` always points to the latest version.
+- Development tools, left out of the zip (see `CONTRIBUTING.md`):
+  - Composer development dependencies with exact versions and a lock that installs on PHP 7.4 to 8.4: PHP_CodeSniffer with WordPress Coding Standards 3 and PHPCompatibilityWP, PHPUnit 9.6 and the PHPUnit Polyfills.
+  - `phpcs.xml.dist`: security, database and WordPress API rules, prefixes, text domain, WordPress 6.2 and PHP 7.4 minimum (0 errors, 0 warnings).
+  - PHPUnit integration tests (`tests/phpunit/`) with the WordPress test suite: REST API, personal data, CSV, thank-you email, alerts, Markdown export, and site isolation on multisite. `bin/install-wp-tests.sh` installs the test suite without svn; `bin/test-local.sh` runs the tests on Windows with the PHP and MySQL of Local, on a dedicated database.
+  - GitHub Actions (`.github/workflows/ci.yml`): PHP syntax from 7.4 to 8.4, PHPCS, PHPUnit (PHP 7.4 with WordPress 6.2, PHP 8.3 with WordPress 7.1, and multisite), Plugin Check on the contents of the zip; on a `v*` tag, a draft release with the zips once the tag, the header and the constant match.
 
 ### Changed
 
