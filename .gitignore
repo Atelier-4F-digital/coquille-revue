@@ -1,6 +1,8 @@
 /build/
 /vendor/
 /node_modules/
+/dist/
+.phpunit.result.cache
 *.zip
 *.log
 *.sql

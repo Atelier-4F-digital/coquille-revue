@@ -15,6 +15,9 @@
 /phpcs.xml.dist
 /composer.json
 /composer.lock
+/phpunit.xml.dist
+/.phpunit.result.cache
+/dist
 /README.md
 /README.en.md
 /CHANGELOG.md

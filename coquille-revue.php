@@ -116,6 +116,7 @@ function coquille_revue_create_table() {
 
     // Format imposé par dbDelta : un espace entre nom et type, types en minuscules,
     // PRIMARY KEY sur sa propre ligne avec deux espaces.
+    // phpcs:disable WordPress.WP.CapitalPDangit -- 'wordpress' is a stored value of the platform column, not text.
     $sql = "CREATE TABLE {$table} (
         id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
         blog_id bigint(20) unsigned NOT NULL DEFAULT '0',
@@ -143,6 +144,7 @@ function coquille_revue_create_table() {
         PRIMARY KEY  (id),
         KEY blog_status (blog_id,status)
     ) {$charset};";
+    // phpcs:enable
 
     require_once ABSPATH . 'wp-admin/includes/upgrade.php';
     dbDelta($sql);
@@ -1743,7 +1745,7 @@ if (defined('WP_CLI') && WP_CLI) {
                         || !preg_match('~\.(php|html|twig|js|json|po)$~', $path) || $file->getSize() > 1048576) {
                         continue;
                     }
-                    $content = file_get_contents($path);
+                    $content = file_get_contents($path); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents -- local file.
                     foreach ($variants as $form => [$text]) {
                         $pos = strpos($content, $text);
                         if ($pos === false) continue;
@@ -1761,7 +1763,7 @@ if (defined('WP_CLI') && WP_CLI) {
             if (!is_file($file) || filesize($file) > COQUILLE_REVUE_MAX_TEXT_LENGTH * 4) {
                 WP_CLI::error('Replacement text file not found or too large.');
             }
-            return preg_replace('/\R$/', '', (string) file_get_contents($file));
+            return preg_replace('/\R$/', '', (string) file_get_contents($file)); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents -- local file.
         }
 
         // Une correction remplace du texte par du texte : ni code, ni balise, ni lien de plus que le texte d'origine.

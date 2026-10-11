@@ -17,6 +17,9 @@
 /phpcs.xml.dist    export-ignore
 /composer.json     export-ignore
 /composer.lock     export-ignore
+/phpunit.xml.dist  export-ignore
+/vendor            export-ignore
+/node_modules      export-ignore
 /README.md         export-ignore
 /README.en.md      export-ignore
 /CHANGELOG.md      export-ignore
