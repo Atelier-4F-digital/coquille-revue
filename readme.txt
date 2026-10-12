@@ -14,7 +14,7 @@ Reviewers highlight text or frame an area on your pages and leave a correction, 
 
 "Coquille" is French for a typo. Coquille Revue lets people proofread your site right on its public pages.
 
-A pencil button floats on every page. A reviewer turns on review mode, selects some text or drags a box around an area, picks the kind of remark (correction, suggestion or question), types it and presses Enter. The annotation is stored in your WordPress database with the page address and the position of the text, and your team processes it from the admin page.
+A pencil button floats on every page. A reviewer turns on review mode, selects some text or drags a box around an area, picks the kind of remark (correction, suggestion or question), types it and presses Enter. The annotation is stored in your WordPress database, and your team processes it from the admin page.
 
 = Who can annotate =
 
@@ -32,7 +32,7 @@ A pencil button floats on every page. A reviewer turns on review mode, selects s
 
 = Apply corrections with Claude Code (optional) =
 
-This plugin does not call any AI service or run any AI model. If you use Claude Code, Anthropic's coding assistant, on your computer, a separate companion plugin for Claude Code, distributed on GitHub and not included in this plugin, reads the annotations through WP-CLI, shows you each change before and after, and applies only what you approve, one annotation at a time. See https://github.com/Atelier-4F-digital/coquille-revue
+This plugin does not call any AI service or run any AI model. If you use Claude Code, Anthropic's coding assistant, a separate companion plugin for Claude Code, distributed on GitHub, reads the annotations through WP-CLI, shows you each change before and after, and applies only what you approve, one annotation at a time. See https://github.com/Atelier-4F-digital/coquille-revue
 
 = Multisite =
 
@@ -40,7 +40,7 @@ Activate the plugin per site or network-wide. Each site only sees, exports and d
 
 = Languages =
 
-The interface is in English and French (a complete French translation is included), and ready for other translations: visitors see the site language, administrators their own language, and emails are sent in the site language. The rules given to Claude Code, the alert codes and the WP-CLI texts stay in English and are never translated, so that no translation can change what Claude Code reads.
+The interface is in English and French (complete French translation included) and ready for other translations; emails are sent in the site language. The rules given to Claude Code, the alert codes and the WP-CLI texts stay in English, so that no translation can change what Claude Code reads.
 
 = For developers =
 
@@ -81,7 +81,7 @@ No. Annotations stay in your WordPress database, and the plugin makes no request
 
 = Does it use AI? =
 
-No. The alerts are simple text rules computed in WordPress. Applying corrections with Claude Code is optional and happens outside WordPress, with a companion plugin for Claude Code distributed separately on GitHub.
+No. The alerts are simple text rules computed in WordPress. Applying corrections with Claude Code is optional and happens outside WordPress.
 
 = Can a correction be applied automatically? =
 
@@ -116,25 +116,10 @@ Deactivating keeps everything. Deleting the plugin from the Plugins screen remov
 
 = 2.6.0 =
 
-Breaking changes:
-
-* WP-CLI and exports use English names, with no alias for the 2.5.0 ones: `apply` options `--all`, `--alerts-reviewed`, `--text-file` and `--field`; JSON keys `_warning`, `alerts`, `found_on_page`; alert codes such as `web_address` or `instruction_or_authority`; source codes `logged_in_user` and `anonymous_unverified`. Update the Claude Code companion plugin to 2.6.0 at the same time: it stops on an older export.
-* The public credit is off by default.
-* Requires WordPress 6.2 or later.
-* The keyboard shortcut is now Alt+Shift+C (Option+Shift+C on Mac), for logged-in users only. Ctrl+Shift+R is no longer taken over.
-* REST API: every field is validated (type, length, allowed values); a wrong type now returns a 400 error. `PATCH /annotation/{id}/status` requires `status`, and `GET /annotations` is paginated (`per_page`, `page`).
-* WP-CLI: `apply --type=option` only changes text options of the site (`blogname`, `blogdescription`, `widget_*`, `theme_mods_*`, ACF `options_*`, extendable with a filter).
-* The thank-you email is a generic message, sent with the WordPress default sender.
-
-Other changes:
-
-* Translation-ready, with a complete French translation. The thank-you and digest emails are sent in the site language.
-* Per-site settings for the thank-you email (on by default) and the public credit (off by default).
-* Admin page: pagination, alerts under each suggestion, confirmation before a status change that sends a thank-you email.
-* Public styles and scripts are files loaded by WordPress, only where review mode is available.
-* Accessible review interface and full touch-screen support.
-* Security: hourly limit per IP address, safer exports, wider detection of links and instructions (French and English).
-* Uninstalling removes the plugin data.
+* Breaking changes: WP-CLI options and export keys in English, WordPress 6.2 or later, shortcut Alt+Shift+C, stricter REST API, public credit off by default.
+* Translation-ready, with a complete French translation.
+* Wider alerts, safer exports and WP-CLI `apply`, per-site settings, accessible and touch-friendly interface, data removed on uninstall.
+* Full list of changes: https://github.com/Atelier-4F-digital/coquille-revue/blob/main/CHANGELOG.md
 
 = 2.5.0 =
 
@@ -144,4 +129,4 @@ Other changes:
 
 = 2.6.0 =
 
-Requires WordPress 6.2. WP-CLI options and export keys are now in English: update the Claude Code companion plugin to 2.6.0 too. The keyboard shortcut becomes Alt+Shift+C and the REST API validates every field. Purge your page cache after updating.
+Requires WordPress 6.2. WP-CLI options and export keys are now in English: update the Claude Code companion plugin to 2.6.0 too. Purge your page cache after updating.

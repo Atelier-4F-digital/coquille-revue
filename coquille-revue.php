@@ -24,6 +24,7 @@ const COQUILLE_REVUE_AUTHOR     = 'Atelier 4F Digital';
 // Traductions : textes source en anglais, fichiers livrés dans languages/ (un paquet de langue de WordPress.org
 // passe avant). Aucun texte traduit n'est demandé avant init.
 add_action('init', function () {
+    // phpcs:ignore PluginCheck.CodeAnalysis.DiscouragedFunctions.load_plugin_textdomainFound -- distributed on GitHub, outside WordPress.org: no language pack is downloaded for it, so the translations bundled in languages/ must be loaded.
     load_plugin_textdomain('coquille-revue', false, dirname(plugin_basename(__FILE__)) . '/languages');
 });
 
