@@ -123,13 +123,23 @@
 
   // Bubble fixed at the bottom of the screen, above the bar, centered on what is annotated (rect: coordinates
   // on the screen); at the top when it would hide it and there is room above. On the right, the pencil stays visible.
+  // When the whole bubble fits on neither side (selection in the middle of the screen), it takes the larger side,
+  // its height limited to the room there (it scrolls inside): it never hides the selection.
+  let bubbleRoom = '', bubbleTop = false;
   function positionBubble(rect) {
     const vw = window.innerWidth, vh = window.innerHeight;
+    bubble.style.maxHeight = '';
     const bw = bubble.offsetWidth, bh = bubble.offsetHeight;
     const maxLeft = vw - bw - (vw > 600 ? 84 : 16);
     bubble.style.left = Math.max(16, Math.min(rect.left + rect.width / 2 - bw / 2, maxLeft)) + 'px';
     bubble.style.right = 'auto';
-    bubble.classList.toggle('coquille-bubble-top', rect.bottom > vh - 56 - bh - 8 && rect.top > bh + 24);
+    const below = vh - 56 - 8 - rect.bottom; // room between the selection and the bottom position
+    const above = rect.top - 8 - 16;         // room between the top position and the selection
+    const squeeze = below < bh && above <= bh && Math.max(below, above) >= 160;
+    bubbleRoom = squeeze ? Math.floor(Math.max(below, above)) + 'px' : '';
+    bubbleTop = squeeze ? above > below : below < bh && above > bh;
+    bubble.style.maxHeight = bubbleRoom;
+    bubble.classList.toggle('coquille-bubble-top', bubbleTop);
   }
 
   // Virtual keyboard open: the visible area shrinks without the page moving; the bubble sits just above it.
@@ -143,7 +153,8 @@
       bubble.style.maxHeight = (vv.height - 16) + 'px';
     } else {
       bubble.style.bottom = '';
-      bubble.style.maxHeight = '';
+      bubble.style.maxHeight = bubbleRoom;
+      bubble.classList.toggle('coquille-bubble-top', bubbleTop);
     }
   }
   if (window.visualViewport) {

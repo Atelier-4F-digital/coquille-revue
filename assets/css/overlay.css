@@ -310,6 +310,10 @@ body.coquille-mode-active #coquille-bar {
   top: 16px;
   bottom: auto;
 }
+/* With a limited height, the content scrolls instead of being squeezed. */
+#coquille-bubble > * {
+  flex-shrink: 0;
+}
 #coquille-bubble.coquille-visible {
   display: flex;
 }
