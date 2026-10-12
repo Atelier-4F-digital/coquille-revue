@@ -227,6 +227,32 @@ class Test_Coquille_Revue_Cli extends Coquille_Revue_Test_Case {
         $this->assertSame('Rejoignez notre groupe', get_post($post)->post_content);
     }
 
+    // A .de or .me domain at the end of a line, whatever the line break (\r\n kept by the API, U+2028), or before a
+    // closing quotation mark, is a link: refused even after review of the alerts.
+    public function test_de_domains_before_any_line_break_or_closing_quote_cannot_be_added() {
+        $post = self::factory()->post->create(['post_content' => 'Allez sur notre site.']);
+        $on   = ['type' => 'post', 'ref' => (string) $post, 'alerts-reviewed' => true];
+        foreach (["evil.de\r\nofficiel", "evil.de\rofficiel", "evil.de\u{2028}officiel", "\u{201C}evil.de\u{201D}", "\u{2018}evil.de\u{2019}"] as $suggestion) {
+            $result = $this->apply($this->insert_annotation(['original_text' => 'notre site', 'suggestion' => $suggestion]), $on);
+            $this->assertIsString($result, wp_json_encode($suggestion));
+            $this->assertStringContainsString('adds a link', $result, wp_json_encode($suggestion));
+        }
+        $this->assertSame('Allez sur notre site.', get_post($post)->post_content);
+    }
+
+    // A .de or .me domain of the original text, even in the middle of a sentence there, is not added when the words
+    // after it are deleted; written a second time, it is.
+    public function test_a_de_or_me_domain_of_the_original_text_can_stay() {
+        $post = self::factory()->post->create(['post_content' => 'Écrivez sur jean-dupont.me pour un devis.']);
+        $on   = ['type' => 'post', 'ref' => (string) $post, 'alerts-reviewed' => true];
+        $id   = $this->insert_annotation(['original_text' => 'jean-dupont.me pour un devis', 'suggestion' => "jean-dupont.me\njean-dupont.me"]);
+        $this->assertStringContainsString('adds a link', $this->apply($id, $on));
+        $id     = $this->insert_annotation(['original_text' => 'jean-dupont.me pour un devis', 'suggestion' => 'jean-dupont.me']);
+        $report = $this->apply($id, $on);
+        $this->assertIsArray($report, is_string($report) ? $report : '');
+        $this->assertSame('Écrivez sur jean-dupont.me.', get_post($post)->post_content);
+    }
+
     // A forgotten space before a word in lower case is not a .de or .me address: corrected without --alerts-reviewed.
     public function test_a_missing_space_before_de_or_me_can_be_corrected() {
         $post = self::factory()->post->create(['post_content' => 'Des fruits, etc.de toute façon. Il est fini.me voilà']);

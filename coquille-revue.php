@@ -82,16 +82,17 @@ const COQUILLE_REVUE_EXPORT_BATCH   = 500;   // exports read the database in bat
 // and bare domains with common extensions, with their path. Extensions that are also common words
 // (la, il, in, it, to…) are left out: "phrase.La suite", a forgotten space, is precisely what a reviewer
 // corrects. .de and .me only count in lower case after a name of at least 3 characters, and only before a path
-// (/ ? #), at the end of a line or of the field (punctuation and spaces aside), or after an @: "evil.de/x",
-// "Allez sur evil.de !" and "contact@exemple.de" are links, but neither "phrase.De plus" nor "etc.de toute façon"
-// nor "fini.me voilà" (a forgotten space before a word in lower case), at the cost of missing "evil.de" alone in the
-// middle of a sentence. Bounded repetitions (63 characters per label, 10 labels at most): unbounded,
-// a text such as "a.a.a.a…" costs quadratic time at every display.
+// (/ ? #), at the end of a line or of the field (punctuation, closing quotes and spaces aside; any line break,
+// \r\n and U+2028 included), or after an @: "evil.de/x", "Allez sur evil.de !", "“evil.de”" and "contact@exemple.de"
+// are links, but neither "phrase.De plus" nor "etc.de toute façon" nor "fini.me voilà" (a forgotten space before a
+// word in lower case), at the cost of missing "evil.de" alone in the middle of a sentence. Bounded repetitions
+// (63 characters per label, 10 labels at most): unbounded, a text such as "a.a.a.a…" costs quadratic time at every display.
+const COQUILLE_REVUE_DE_ME_END    = '(?=[/?#]|[\h.,;:!?)\]»"\'”’›…]*(?:\R|\z))';
 const COQUILLE_REVUE_LINK_PATTERN = '~(?:https?:|mailto:|tel:\+?\d|data:[a-z]+/|//[a-z0-9-]+\.|www\.)\S*'
     . '|(?:\b(?:t\.me|wa\.me|bit\.ly|tinyurl\.com|goo\.gl|ow\.ly|is\.gd|buff\.ly|rebrand\.ly|cutt\.ly|shorturl\.at|lnkd\.in)'
     . '|\b(?:[a-z0-9-]{1,63}\.){0,8}(?:[a-z0-9-]{1,63}\.(?:com|net|org|info|biz|io|co|app|dev|xyz|icu|online|site|store|shop|top|club|vip|buzz|cfd|sbs|bond|cyou|monster|lol'
     . '|fr|eu|ru|su|cn|uk|ly|gg|cc|tv|tk|ml|ga|cf|gq|pw|ws|fm|nl|pl|br|jp|kr|ua|kz|ir|cz|ch|mc|tn|dz|sn|cm|gl|vn|tr|example)'
-    . '|[a-z0-9-]{3,63}\.(?-i:de|me)(?=[/?#]|[\h.,;:!?)\]»"\']*(?:\n|\z)))'
+    . '|[a-z0-9-]{3,63}\.(?-i:de|me)' . COQUILLE_REVUE_DE_ME_END . ')'
     . '|(?<=@)(?:[a-z0-9-]{1,63}\.){0,8}[a-z0-9-]{1,63}\.(?-i:de|me))\b(?:[/?#]\S*)?~iu';
 
 // Personal data
@@ -2212,14 +2213,16 @@ if (defined('WP_CLI') && WP_CLI) {
         }
 
         // Matches of $to that are not, verbatim and as many times, in $from; null when a text cannot be read.
-        // For links, punctuation stuck to the end does not count: correcting "www.site.fr !" into "www.site.fr."
-        // does not change the address.
-        private static function added_matches($pattern, $from, $to, $trim_punctuation = false) {
-            if (preg_match_all($pattern, $from, $old) === false || preg_match_all($pattern, $to, $new) === false) {
+        // For links, punctuation stuck to the end does not count (correcting "www.site.fr !" into "www.site.fr."
+        // does not change the address), and a .de or .me domain of $from counts wherever it stands there: correcting
+        // "jean-dupont.me pour un devis" into "jean-dupont.me" adds no link.
+        private static function added_matches($pattern, $from, $to, $links = false) {
+            $from_pattern = $links ? str_replace(COQUILLE_REVUE_DE_ME_END, '', $pattern) : $pattern;
+            if (preg_match_all($from_pattern, $from, $old) === false || preg_match_all($pattern, $to, $new) === false) {
                 return null;
             }
-            if ($trim_punctuation) {
-                $trim   = fn($match) => preg_replace('~[.,;:!?)\]»"\'’…]+$~u', '', $match) ?? $match;
+            if ($links) {
+                $trim   = fn($match) => preg_replace('~[.,;:!?)\]»"\'”’›…]+$~u', '', $match) ?? $match;
                 $old[0] = array_map($trim, $old[0]);
                 $new[0] = array_map($trim, $new[0]);
             }
