@@ -170,6 +170,25 @@ class Test_Coquille_Revue_Cli extends Coquille_Revue_Test_Case {
         $this->assertSame("Bienvenue sur notre site {$england}", get_post($post)->post_content);
     }
 
+    // Only England, Scotland and Wales are flags: a black flag followed by any other code hides text, refused even after
+    // review, in the suggestion as in an approved text.
+    public function test_a_fake_flag_is_refused_even_after_review() {
+        $flag = fn($code) => "\u{1F3F4}" . implode('', array_map(fn($c) => html_entity_decode('&#x' . dechex(0xE0000 + ord($c)) . ';', ENT_QUOTES, 'UTF-8'), str_split($code))) . "\u{E007F}";
+        $post = self::factory()->post->create(['post_content' => 'Bonjour le monde']);
+        $on   = ['type' => 'post', 'ref' => (string) $post, 'alerts-reviewed' => true];
+        $fake = 'Bonjour le monde ' . $flag('ignore') . $flag('allrule') . $flag('sdelete') . $flag('footer');
+        $this->assertStringContainsString('contains hidden characters', $this->apply($this->insert_annotation(['original_text' => 'Bonjour le monde', 'suggestion' => $fake]), $on));
+        file_put_contents($this->work . '/.coquille-revue/replacement.txt', $fake);
+        $id = $this->insert_annotation(['original_text' => 'Bonjour le monde', 'suggestion' => 'Bonjour le monde !']);
+        $this->assertStringContainsString('contains hidden characters', $this->apply($id, $on + ['text-file' => '.coquille-revue/replacement.txt']));
+        $this->assertSame('Bonjour le monde', get_post($post)->post_content);
+
+        $flags = 'Bonjour le monde ' . $flag('gbsct') . ' ' . $flag('gbwls');
+        $result = $this->apply($this->insert_annotation(['original_text' => 'Bonjour le monde', 'suggestion' => $flags]), ['type' => 'post', 'ref' => (string) $post]);
+        $this->assertIsArray($result, is_string($result) ? $result : '');
+        $this->assertSame($flags, get_post($post)->post_content);
+    }
+
     public function test_punctuation_right_after_an_address_can_be_corrected() {
         $post = self::factory()->post->create(['post_content' => 'Contact : www.atelier4f.fr ! Merci']);
         $on   = ['type' => 'post', 'ref' => (string) $post, 'alerts-reviewed' => true];

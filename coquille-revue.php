@@ -709,9 +709,12 @@ function coquille_revue_save_annotation(WP_REST_Request $request) {
         return new WP_Error('invalid_url', __('Invalid page address.', 'coquille-revue'), ['status' => 400]);
     }
 
-    // Bidirectional controls, Tag characters outside a flag and U+061C: they hide or reverse text
-    foreach (['originalText', 'suggestion', 'reviewerName', 'pageTitle', 'xpath', 'cssSelector'] as $f) {
-        if (coquille_revue_has_forbidden_chars($request->get_param($f))) {
+    // Bidirectional controls, Tag characters outside a flag and U+061C: they hide or reverse text. The address is
+    // typed by the visitor too (any path of the site is accepted): it is checked as sent and with its path decoded.
+    $fields = array_map(fn($f) => $request->get_param($f), ['originalText', 'suggestion', 'reviewerName', 'pageTitle', 'xpath', 'cssSelector', 'url']);
+    $fields[] = rawurldecode((string) wp_parse_url($url, PHP_URL_PATH));
+    foreach ($fields as $field) {
+        if (coquille_revue_has_forbidden_chars($field)) {
             return new WP_Error('invalid_chars', __('Characters not allowed.', 'coquille-revue'), ['status' => 400]);
         }
     }
@@ -1288,12 +1291,13 @@ const COQUILLE_REVUE_INVISIBLE_PATTERN = '~[\p{Cf}\p{Co}\x{034F}\x{115F}\x{1160}
 // in a text without Chinese, Japanese or Korean script (which uses them normally).
 const COQUILLE_REVUE_LOOKALIKE_SCRIPTS = '\p{Cyrillic}\p{Greek}\p{Armenian}\p{Cherokee}\p{Coptic}\p{Lisu}\p{Canadian_Aboriginal}';
 
-// Emoji flag made of a sequence of Tag characters (black flag U+1F3F4, code of the subdivision, U+E007F), for example
-// the flag of England: its Tag characters are allowed.
-const COQUILLE_REVUE_FLAG_SEQUENCE = '\x{1F3F4}[\x{E0030}-\x{E0039}\x{E0061}-\x{E007A}]{3,7}\x{E007F}';
+// Emoji flags made of Tag characters (black flag U+1F3F4, code of the subdivision, U+E007F): only the three that
+// Unicode recommends and systems show, England (gbeng), Scotland (gbsct) and Wales (gbwls). Any other code is not
+// a flag that anyone sees, only a black flag followed by hidden letters that an AI reads.
+const COQUILLE_REVUE_FLAG_SEQUENCE = '\x{1F3F4}\x{E0067}\x{E0062}(?:\x{E0065}\x{E006E}\x{E0067}|\x{E0073}\x{E0063}\x{E0074}|\x{E0077}\x{E006C}\x{E0073})\x{E007F}';
 
 // Refused on submission and by "apply", even after review: bidirectional controls (they hide or reverse text),
-// Tag characters U+E0000–U+E007F outside a flag (an invisible text that an AI reads) and U+061C.
+// Tag characters U+E0000–U+E007F outside the three flags above (an invisible text that an AI reads) and U+061C.
 const COQUILLE_REVUE_FORBIDDEN_PATTERN = '~[\x{202A}-\x{202E}\x{2066}-\x{2069}\x{061C}\x{E0000}-\x{E007F}]~u';
 
 // long_addition alert: the suggestion holds at least this number of words that are not in the original text, a whole

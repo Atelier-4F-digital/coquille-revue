@@ -48,6 +48,21 @@ class Test_Coquille_Revue_Alerts extends Coquille_Revue_Test_Case {
         $this->assertSame(['invisible_characters (U+E0067, U+E0062)'], $this->alerts("Allez \u{E0067}\u{E0062} l'équipe"));
     }
 
+    // Only England, Scotland and Wales are flags made of Tag characters that systems show. Any other code is a black
+    // flag followed by hidden letters: alert, characters refused, and shown as [U+XXXX] in the exports for Claude Code.
+    public function test_a_fake_flag_is_hidden_text() {
+        $flag = fn($code) => "\u{1F3F4}" . implode('', array_map(fn($c) => html_entity_decode('&#x' . dechex(0xE0000 + ord($c)) . ';', ENT_QUOTES, 'UTF-8'), str_split($code))) . "\u{E007F}";
+        foreach (['gbeng', 'gbsct', 'gbwls'] as $code) {
+            $this->assertSame([], $this->alerts('Allez ' . $flag($code)), $code);
+            $this->assertFalse(coquille_revue_has_forbidden_chars($flag($code)), $code);
+            $this->assertSame($flag($code), coquille_revue_visible_text($flag($code)), $code);
+        }
+        $fake = 'Bonjour le monde ' . $flag('ignore') . $flag('allrule');
+        $this->assertSame(['invisible_characters (U+E0069, U+E0067, U+E006E, U+E006F, U+E0072, U+E0065, U+E007F, U+E0061, U+E006C, U+E0075)'], $this->alerts($fake));
+        $this->assertTrue(coquille_revue_has_forbidden_chars($fake));
+        $this->assertSame("Bonjour le monde \u{1F3F4}[U+E0069][U+E0067][U+E006E][U+E006F][U+E0072][U+E0065][U+E007F]", coquille_revue_visible_text('Bonjour le monde ' . $flag('ignore')));
+    }
+
     public function test_honest_corrections_have_no_alert() {
         foreach ([
             'Bienvenue sur notre site',

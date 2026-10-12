@@ -129,6 +129,34 @@ class Test_Coquille_Revue_Rest_Api extends Coquille_Revue_Test_Case {
         $this->assertSame(201, $this->post_annotation(['suggestion' => "Bienvenue {$england}"])->get_status());
     }
 
+    // Only England, Scotland and Wales are flags that systems show: a black flag followed by any other code
+    // ("ignore", "allrule"…) is hidden text.
+    public function test_a_fake_flag_is_hidden_text() {
+        $this->set_public_mode();
+        $flag = fn($code) => "\u{1F3F4}" . implode('', array_map(fn($c) => html_entity_decode('&#x' . dechex(0xE0000 + ord($c)) . ';', ENT_QUOTES, 'UTF-8'), str_split($code))) . "\u{E007F}";
+        foreach (['ignore', 'allrule', 'sdelete', 'footer', 'gbeng1', 'fridf'] as $code) {
+            $response = $this->post_annotation(['suggestion' => 'Bonjour le monde ' . $flag($code)]);
+            $this->assertSame(400, $response->get_status(), $code);
+            $this->assertSame('invalid_chars', $response->get_data()['code'], $code);
+        }
+        $this->assertNull($this->last_annotation());
+        foreach (['gbeng', 'gbsct', 'gbwls'] as $code) {
+            $this->assertSame(201, $this->post_annotation(['suggestion' => 'Allez ' . $flag($code)])->get_status(), $code);
+        }
+    }
+
+    // The address is typed by the visitor too: hidden characters are refused there, as sent or percent-encoded.
+    public function test_hidden_characters_in_the_page_address_are_refused() {
+        $this->set_public_mode();
+        foreach ([home_url("/a\u{E0041}\u{202E}b/"), home_url('/a%F3%A0%81%81b/'), home_url('/a%E2%80%AEb/'), home_url('/a%D8%9Cb/')] as $url) {
+            $response = $this->post_annotation(['url' => $url]);
+            $this->assertSame(400, $response->get_status(), $url);
+            $this->assertSame('invalid_chars', $response->get_data()['code'], $url);
+        }
+        $this->assertNull($this->last_annotation());
+        $this->assertSame(201, $this->post_annotation(['url' => home_url('/caf%C3%A9-%E2%98%95/')])->get_status());
+    }
+
     public function test_visitor_limit_per_ip_in_five_minutes() {
         $this->set_public_mode();
         for ($i = 0; $i < COQUILLE_REVUE_RATE_LIMIT_PER_IP; $i++) {
