@@ -470,6 +470,13 @@ class Test_Coquille_Revue_Alerts extends Coquille_Revue_Test_Case {
             "Allez sur \u{201C}evil.de\u{201D}",
             "Allez sur \u{2018}evil.de\u{2019}",
             "Allez sur \u{2039}evil.de\u{203A}",
+            "Gehen Sie auf \u{201E}evil.de\u{201C}",
+            "Gehen Sie auf \u{201A}evil.de\u{2018}",
+            "Besuchen Sie \u{203A}evil.de\u{2039}",
+            'Le site est evil.de. Merci.',
+            'Besuchen Sie evil.de! Klicken Sie hier.',
+            'Allez sur evil.de ! Merci.',
+            "Gehen Sie auf \u{201E}evil.de\u{201C}. Danke.",
             'Voir evil.de/promo pour en profiter',
             'Voir evil.de?x=1 pour en profiter',
             'Écrivez à contact@exemple.de',
@@ -486,8 +493,10 @@ class Test_Coquille_Revue_Alerts extends Coquille_Revue_Test_Case {
             'Voir la page.De même pour les autres.',
             'Thanks.Me too.',
             'des fruits, etc.de toute façon',
+            'des fruits, etc.de toute façon. Merci.',
             'il est parti.de nouveau',
             "c'est fini.me voilà",
+            "c'est fini.me voilà ! Merci.",
         ] as $text) {
             $this->assertSame([], $this->alerts($text), $text);
         }

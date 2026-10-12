@@ -227,12 +227,23 @@ class Test_Coquille_Revue_Cli extends Coquille_Revue_Test_Case {
         $this->assertSame('Rejoignez notre groupe', get_post($post)->post_content);
     }
 
-    // A .de or .me domain at the end of a line, whatever the line break (\r\n kept by the API, U+2028), or before a
-    // closing quotation mark, is a link: refused even after review of the alerts.
+    // A .de or .me domain at the end of a line, whatever the line break (\r\n kept by the API, U+2028), before a
+    // closing quotation mark (English, German or Swiss), or at the end of a sentence followed by another one, is a link:
+    // refused even after review of the alerts.
     public function test_de_domains_before_any_line_break_or_closing_quote_cannot_be_added() {
         $post = self::factory()->post->create(['post_content' => 'Allez sur notre site.']);
         $on   = ['type' => 'post', 'ref' => (string) $post, 'alerts-reviewed' => true];
-        foreach (["evil.de\r\nofficiel", "evil.de\rofficiel", "evil.de\u{2028}officiel", "\u{201C}evil.de\u{201D}", "\u{2018}evil.de\u{2019}"] as $suggestion) {
+        foreach ([
+            "evil.de\r\nofficiel",
+            "evil.de\rofficiel",
+            "evil.de\u{2028}officiel",
+            "\u{201C}evil.de\u{201D}",
+            "\u{2018}evil.de\u{2019}",
+            "\u{201E}evil.de\u{201C}",
+            "\u{203A}evil.de\u{2039}",
+            'evil.de. Merci.',
+            'evil.de ! Merci.',
+        ] as $suggestion) {
             $result = $this->apply($this->insert_annotation(['original_text' => 'notre site', 'suggestion' => $suggestion]), $on);
             $this->assertIsString($result, wp_json_encode($suggestion));
             $this->assertStringContainsString('adds a link', $result, wp_json_encode($suggestion));

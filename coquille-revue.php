@@ -83,11 +83,12 @@ const COQUILLE_REVUE_EXPORT_BATCH   = 500;   // exports read the database in bat
 // (la, il, in, it, to…) are left out: "phrase.La suite", a forgotten space, is precisely what a reviewer
 // corrects. .de and .me only count in lower case after a name of at least 3 characters, and only before a path
 // (/ ? #), at the end of a line or of the field (punctuation, closing quotes and spaces aside; any line break,
-// \r\n and U+2028 included), or after an @: "evil.de/x", "Allez sur evil.de !", "“evil.de”" and "contact@exemple.de"
-// are links, but neither "phrase.De plus" nor "etc.de toute façon" nor "fini.me voilà" (a forgotten space before a
-// word in lower case), at the cost of missing "evil.de" alone in the middle of a sentence. Bounded repetitions
-// (63 characters per label, 10 labels at most): unbounded, a text such as "a.a.a.a…" costs quadratic time at every display.
-const COQUILLE_REVUE_DE_ME_END    = '(?=[/?#]|[\h.,;:!?)\]»"\'”’›…]*(?:\R|\z))';
+// \r\n and U+2028 included), at the end of a sentence followed by a capital letter, or after an @: "evil.de/x",
+// "Allez sur evil.de !", "“evil.de”", "„evil.de“", "evil.de. Merci." and "contact@exemple.de" are links, but neither
+// "phrase.De plus" nor "etc.de toute façon" nor "fini.me voilà" (a forgotten space before a word), at the cost of
+// missing "evil.de" alone in the middle of a sentence. Bounded repetitions (63 characters per label, 10 labels at
+// most): unbounded, a text such as "a.a.a.a…" costs quadratic time at every display.
+const COQUILLE_REVUE_DE_ME_END    = '(?=[/?#]|[\h.,;:!?)\]»"\'”’›“‘‹…]*(?:\R|\z)|[\h)\]»"\'”’›“‘‹]*[.!?…]+[)\]»"\'”’›“‘‹]*\h+(?-i:\p{Lu}))';
 const COQUILLE_REVUE_LINK_PATTERN = '~(?:https?:|mailto:|tel:\+?\d|data:[a-z]+/|//[a-z0-9-]+\.|www\.)\S*'
     . '|(?:\b(?:t\.me|wa\.me|bit\.ly|tinyurl\.com|goo\.gl|ow\.ly|is\.gd|buff\.ly|rebrand\.ly|cutt\.ly|shorturl\.at|lnkd\.in)'
     . '|\b(?:[a-z0-9-]{1,63}\.){0,8}(?:[a-z0-9-]{1,63}\.(?:com|net|org|info|biz|io|co|app|dev|xyz|icu|online|site|store|shop|top|club|vip|buzz|cfd|sbs|bond|cyou|monster|lol'
@@ -2229,7 +2230,7 @@ if (defined('WP_CLI') && WP_CLI) {
                 return null;
             }
             if ($links) {
-                $trim   = fn($match) => preg_replace('~[.,;:!?)\]»"\'”’›…]+$~u', '', $match) ?? $match;
+                $trim   = fn($match) => preg_replace('~[.,;:!?)\]»"\'”’›“‘‹…]+$~u', '', $match) ?? $match;
                 $old[0] = array_map($trim, $old[0]);
                 $new[0] = array_map($trim, $new[0]);
             }
