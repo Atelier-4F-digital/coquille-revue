@@ -9,7 +9,7 @@ msgstr ""
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"POT-Creation-Date: 2026-10-12T07:32:11+00:00\n"
+"POT-Creation-Date: 2026-10-12T19:35:41+00:00\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "X-Generator: WP-CLI 2.12.0\n"
 "X-Domain: coquille-revue\n"
@@ -39,279 +39,279 @@ msgstr ""
 msgid "https://atelier4fdigital.com"
 msgstr ""
 
-#: coquille-revue.php:309
-#: coquille-revue.php:471
+#: coquille-revue.php:337
+#: coquille-revue.php:499
 msgid "Selected text"
 msgstr ""
 
 #. translators: 1: width of the selected area in pixels, 2: its height in pixels
-#: coquille-revue.php:311
+#: coquille-revue.php:339
 #, php-format
 msgid "Selected area (%1$s×%2$s)"
 msgstr ""
 
 #. translators: %s: quoted text; use the quotation marks of your language
-#: coquille-revue.php:313
+#: coquille-revue.php:341
 #, php-format
 msgctxt "quoted text"
 msgid "“%s”"
 msgstr ""
 
 #. translators: 1: CSS selector of the selected area, 2: text found in the area
-#: coquille-revue.php:315
+#: coquille-revue.php:343
 #, php-format
 msgid "%1$s — “%2$s”"
 msgstr ""
 
-#: coquille-revue.php:316
-#: coquille-revue.php:496
+#: coquille-revue.php:344
+#: coquille-revue.php:524
 msgid "Send"
 msgstr ""
 
-#: coquille-revue.php:317
+#: coquille-revue.php:345
 msgid "Sending…"
 msgstr ""
 
-#: coquille-revue.php:318
+#: coquille-revue.php:346
 msgid "Thank you, your suggestion has been sent"
 msgstr ""
 
-#: coquille-revue.php:319
+#: coquille-revue.php:347
 msgid "Invalid email address."
 msgstr ""
 
-#: coquille-revue.php:320
+#: coquille-revue.php:348
 msgid "Your text is too long."
 msgstr ""
 
-#: coquille-revue.php:321
+#: coquille-revue.php:349
 msgid "Too many submissions for now, please try again in a few minutes."
 msgstr ""
 
-#: coquille-revue.php:322
+#: coquille-revue.php:350
 msgid "Log in to suggest a correction."
 msgstr ""
 
-#: coquille-revue.php:323
+#: coquille-revue.php:351
 msgid "You are not allowed to suggest a correction."
 msgstr ""
 
 #. translators: %s: HTTP status code
-#: coquille-revue.php:325
+#: coquille-revue.php:353
 #, php-format
 msgid "Sending failed (error %s)."
 msgstr ""
 
-#: coquille-revue.php:332
+#: coquille-revue.php:360
 msgctxt "type of remark"
 msgid "Correction"
 msgstr ""
 
-#: coquille-revue.php:333
+#: coquille-revue.php:361
 msgctxt "type of remark"
 msgid "Suggestion"
 msgstr ""
 
-#: coquille-revue.php:334
+#: coquille-revue.php:362
 msgctxt "type of remark"
 msgid "Question"
 msgstr ""
 
-#: coquille-revue.php:371
+#: coquille-revue.php:399
 msgid "(opens in a new tab)"
 msgstr ""
 
-#: coquille-revue.php:374
+#: coquille-revue.php:402
 msgid "Your suggestion is saved with your account name."
 msgstr ""
 
-#: coquille-revue.php:376
+#: coquille-revue.php:404
 msgid "Name and email are optional. The email is only used to let you know when your suggestion is applied, then it is deleted."
 msgstr ""
 
-#: coquille-revue.php:378
+#: coquille-revue.php:406
 msgid "Name is optional."
 msgstr ""
 
 #. translators: %d: number of days
-#: coquille-revue.php:382
+#: coquille-revue.php:410
 #, php-format
 msgid "The IP address is kept for %d day to fight spam."
 msgid_plural "The IP address is kept for %d days to fight spam."
 msgstr[0] ""
 msgstr[1] ""
 
-#: coquille-revue.php:384
+#: coquille-revue.php:412
 msgid "Suggestions may be processed with an AI assistant."
 msgstr ""
 
-#: coquille-revue.php:403
-#: coquille-revue.php:452
+#: coquille-revue.php:431
+#: coquille-revue.php:480
 msgid "Review mode"
 msgstr ""
 
-#: coquille-revue.php:412
+#: coquille-revue.php:440
 msgid "Help us improve this page"
 msgstr ""
 
-#: coquille-revue.php:413
+#: coquille-revue.php:441
 msgid "Spotted a typo, some wording to rephrase or an area to improve? Turn on review mode to leave us a suggestion right on the page."
 msgstr ""
 
 #. translators: %s: the keys of the keyboard shortcut
-#: coquille-revue.php:418
+#: coquille-revue.php:446
 #, php-format
 msgid "Keyboard shortcut: %s"
 msgstr ""
 
-#: coquille-revue.php:419
+#: coquille-revue.php:447
 msgctxt "keyboard key"
 msgid "Shift"
 msgstr ""
 
-#: coquille-revue.php:423
+#: coquille-revue.php:451
 msgid "Start reviewing"
 msgstr ""
 
 #. translators: 1: plugin name, 2: author name, linked to the author's website
-#: coquille-revue.php:429
-#: coquille-revue.php:2559
+#: coquille-revue.php:457
+#: coquille-revue.php:2656
 #, php-format
 msgid "%1$s plugin · by %2$s"
 msgstr ""
 
-#: coquille-revue.php:440
+#: coquille-revue.php:468
 msgid "Review toolbar"
 msgstr ""
 
 #. translators: %s: display name of the logged-in user
-#: coquille-revue.php:447
+#: coquille-revue.php:475
 #, php-format
 msgid "Review mode — logged in as %s"
 msgstr ""
 
-#: coquille-revue.php:457
+#: coquille-revue.php:485
 msgid "Select some text"
 msgstr ""
 
 #. translators: %s: "click and drag", shown as a key combination
-#: coquille-revue.php:460
+#: coquille-revue.php:488
 #, php-format
 msgid "or %s over an area"
 msgstr ""
 
-#: coquille-revue.php:461
+#: coquille-revue.php:489
 msgid "click and drag"
 msgstr ""
 
-#: coquille-revue.php:463
+#: coquille-revue.php:491
 msgid "With the keyboard: select the text, then press Enter"
 msgstr ""
 
-#: coquille-revue.php:465
+#: coquille-revue.php:493
 msgctxt "leave review mode"
 msgid "Stop"
 msgstr ""
 
-#: coquille-revue.php:472
+#: coquille-revue.php:500
 msgid "Close"
 msgstr ""
 
-#: coquille-revue.php:477
-#: coquille-revue.php:478
+#: coquille-revue.php:505
+#: coquille-revue.php:506
 msgid "Your name (optional)"
 msgstr ""
 
-#: coquille-revue.php:480
-#: coquille-revue.php:481
+#: coquille-revue.php:508
+#: coquille-revue.php:509
 msgid "Your email (optional)"
 msgstr ""
 
-#: coquille-revue.php:485
+#: coquille-revue.php:513
 msgid "Privacy"
 msgstr ""
 
-#: coquille-revue.php:486
+#: coquille-revue.php:514
 msgid "Your suggestion"
 msgstr ""
 
-#: coquille-revue.php:487
+#: coquille-revue.php:515
 msgid "Your suggestion…"
 msgstr ""
 
-#: coquille-revue.php:488
+#: coquille-revue.php:516
 msgid "Enter to send · Shift+Enter for a new line · Esc to cancel"
 msgstr ""
 
-#: coquille-revue.php:488
+#: coquille-revue.php:516
 msgid "Press Enter or the Send button to send"
 msgstr ""
 
-#: coquille-revue.php:489
+#: coquille-revue.php:517
 msgid "Type of remark"
 msgstr ""
 
-#: coquille-revue.php:497
+#: coquille-revue.php:525
 msgid "Cancel"
 msgstr ""
 
-#: coquille-revue.php:543
-#: coquille-revue.php:555
+#: coquille-revue.php:571
+#: coquille-revue.php:583
 msgid "You must be logged in to do this."
 msgstr ""
 
-#: coquille-revue.php:546
-#: coquille-revue.php:558
-#: coquille-revue.php:1124
-#: coquille-revue.php:1146
-#: coquille-revue.php:1159
-#: coquille-revue.php:1182
-#: coquille-revue.php:1201
+#: coquille-revue.php:574
+#: coquille-revue.php:586
+#: coquille-revue.php:1155
+#: coquille-revue.php:1177
+#: coquille-revue.php:1190
+#: coquille-revue.php:1213
+#: coquille-revue.php:1232
 msgid "Sorry, you are not allowed to do this."
 msgstr ""
 
-#: coquille-revue.php:695
+#: coquille-revue.php:723
 msgid "Suspicious request."
 msgstr ""
 
 #. translators: %s: technical name of the field (originalText or suggestion)
-#: coquille-revue.php:702
+#: coquille-revue.php:730
 #, php-format
 msgid "The %s field is too short."
 msgstr ""
 
-#: coquille-revue.php:709
+#: coquille-revue.php:737
 msgid "Invalid page address."
 msgstr ""
 
-#: coquille-revue.php:715
+#: coquille-revue.php:746
 msgid "Characters not allowed."
 msgstr ""
 
-#: coquille-revue.php:725
+#: coquille-revue.php:756
 msgid "Invalid position in the page."
 msgstr ""
 
-#: coquille-revue.php:745
+#: coquille-revue.php:776
 msgid "Too many submissions, please try again later."
 msgstr ""
 
-#: coquille-revue.php:794
+#: coquille-revue.php:825
 msgid "The annotation could not be saved."
 msgstr ""
 
-#: coquille-revue.php:894
-#: coquille-revue.php:2307
+#: coquille-revue.php:925
+#: coquille-revue.php:2404
 msgid "Invalid status."
 msgstr ""
 
-#: coquille-revue.php:899
-#: coquille-revue.php:2308
+#: coquille-revue.php:930
+#: coquille-revue.php:2405
 msgid "Annotation not found."
 msgstr ""
 
 #. translators: 1: number of new annotations, 2: site name
-#: coquille-revue.php:957
+#: coquille-revue.php:988
 #, php-format
 msgid "[Coquille Revue] %1$d new annotation on %2$s"
 msgid_plural "[Coquille Revue] %1$d new annotations on %2$s"
@@ -319,382 +319,382 @@ msgstr[0] ""
 msgstr[1] ""
 
 #. translators: %d: number of new annotations
-#: coquille-revue.php:959
+#: coquille-revue.php:990
 #, php-format
 msgid "%d new annotation to review."
 msgid_plural "%d new annotations to review."
 msgstr[0] ""
 msgstr[1] ""
 
-#: coquille-revue.php:989
+#: coquille-revue.php:1020
 msgid "Hello,"
 msgstr ""
 
 #. translators: 1: date of the suggestion, 2: site name
-#: coquille-revue.php:991
+#: coquille-revue.php:1022
 #, php-format
 msgid "The suggestion you left on %1$s on the site “%2$s” has been applied. Thank you for your review, it really helps."
 msgstr ""
 
-#: coquille-revue.php:993
+#: coquille-revue.php:1024
 msgid "If you did not make this suggestion, please ignore this message."
 msgstr ""
 
 #. translators: %s: site name
-#: coquille-revue.php:995
+#: coquille-revue.php:1026
 #, php-format
 msgid "The %s team"
 msgstr ""
 
 #. translators: %s: site name
-#: coquille-revue.php:1001
+#: coquille-revue.php:1032
 #, php-format
 msgid "[%s] Your suggestion has been applied, thank you!"
 msgstr ""
 
 #. translators: %d: number of days
-#: coquille-revue.php:1020
+#: coquille-revue.php:1051
 #, php-format
 msgid "The IP address is used to limit spam and is deleted after %d day."
 msgid_plural "The IP address is used to limit spam and is deleted after %d days."
 msgstr[0] ""
 msgstr[1] ""
 
-#: coquille-revue.php:1023
+#: coquille-revue.php:1054
 msgid "When a visitor suggests a correction with the Coquille Revue proofreading tool, we store the text concerned and the suggestion, the page address, their name and email address if they give them (optional), and their IP address."
 msgstr ""
 
-#: coquille-revue.php:1024
+#: coquille-revue.php:1055
 msgid "The text, the suggestion and the name are visible to the editors and administrators of the site; the email and the IP address to administrators only. To apply the corrections, the text, the suggestion and the name may be sent to an artificial intelligence assistant (for example Claude, by Anthropic); the email and the IP address never are."
 msgstr ""
 
 #. translators: %d: number of months
-#: coquille-revue.php:1026
+#: coquille-revue.php:1057
 #, php-format
 msgid "The email is only used to let the person know when their suggestion is applied: it is deleted, along with the name, within a day after the suggestion is processed, and after %d month at the latest."
 msgid_plural "The email is only used to let the person know when their suggestion is applied: it is deleted, along with the name, within a day after the suggestion is processed, and after %d months at the latest."
 msgstr[0] ""
 msgstr[1] ""
 
-#: coquille-revue.php:1030
+#: coquille-revue.php:1061
 msgid "When a visitor suggests a correction with the Coquille Revue proofreading tool, we store the text concerned and the suggestion, the page address, their name if they give it (optional), and their IP address."
 msgstr ""
 
-#: coquille-revue.php:1031
+#: coquille-revue.php:1062
 msgid "The text, the suggestion and the name are visible to the editors and administrators of the site; the IP address to administrators only. To apply the corrections, the text, the suggestion and the name may be sent to an artificial intelligence assistant (for example Claude, by Anthropic); the IP address never is."
 msgstr ""
 
 #. translators: %d: number of months
-#: coquille-revue.php:1033
+#: coquille-revue.php:1064
 #, php-format
 msgid "The name is deleted within a day after the suggestion is processed, and after %d month at the latest."
 msgid_plural "The name is deleted within a day after the suggestion is processed, and after %d months at the latest."
 msgstr[0] ""
 msgstr[1] ""
 
-#: coquille-revue.php:1067
+#: coquille-revue.php:1098
 msgid "Proofreading suggestions"
 msgstr ""
 
-#: coquille-revue.php:1070
-#: coquille-revue.php:1230
-#: coquille-revue.php:2486
+#: coquille-revue.php:1101
+#: coquille-revue.php:1261
+#: coquille-revue.php:2583
 msgid "Page"
 msgstr ""
 
-#: coquille-revue.php:1071
-#: coquille-revue.php:1230
-#: coquille-revue.php:2487
+#: coquille-revue.php:1102
+#: coquille-revue.php:1261
+#: coquille-revue.php:2584
 msgid "Original text"
 msgstr ""
 
-#: coquille-revue.php:1072
-#: coquille-revue.php:1231
-#: coquille-revue.php:2488
+#: coquille-revue.php:1103
+#: coquille-revue.php:1262
+#: coquille-revue.php:2585
 msgctxt "proposed text"
 msgid "Suggestion"
 msgstr ""
 
-#: coquille-revue.php:1073
+#: coquille-revue.php:1104
 msgid "Name"
 msgstr ""
 
-#: coquille-revue.php:1074
+#: coquille-revue.php:1105
 msgid "Email"
 msgstr ""
 
-#: coquille-revue.php:1075
+#: coquille-revue.php:1106
 msgid "IP address"
 msgstr ""
 
-#: coquille-revue.php:1076
-#: coquille-revue.php:1231
-#: coquille-revue.php:2492
+#: coquille-revue.php:1107
+#: coquille-revue.php:1262
+#: coquille-revue.php:2589
 msgid "Date"
 msgstr ""
 
-#: coquille-revue.php:1095
+#: coquille-revue.php:1126
 msgid "Coquille Revue: the text of the suggestions is kept, with no link to the person anymore."
 msgstr ""
 
-#: coquille-revue.php:1230
+#: coquille-revue.php:1261
 msgid "Mode"
 msgstr ""
 
-#: coquille-revue.php:1230
-#: coquille-revue.php:2489
+#: coquille-revue.php:1261
+#: coquille-revue.php:2586
 msgid "Type"
 msgstr ""
 
-#: coquille-revue.php:1231
-#: coquille-revue.php:2490
+#: coquille-revue.php:1262
+#: coquille-revue.php:2587
 msgid "Author"
 msgstr ""
 
-#: coquille-revue.php:1231
-#: coquille-revue.php:2491
+#: coquille-revue.php:1262
+#: coquille-revue.php:2588
 msgid "Status"
 msgstr ""
 
-#: coquille-revue.php:1587
+#: coquille-revue.php:1682
 msgid "(area without text)"
 msgstr ""
 
-#: coquille-revue.php:1595
+#: coquille-revue.php:1690
 msgid "Anonymous"
 msgstr ""
 
-#: coquille-revue.php:2223
+#: coquille-revue.php:2320
 msgctxt "set the status"
 msgid "Pending"
 msgstr ""
 
-#: coquille-revue.php:2224
+#: coquille-revue.php:2321
 msgctxt "set the status"
 msgid "In progress"
 msgstr ""
 
-#: coquille-revue.php:2225
+#: coquille-revue.php:2322
 msgctxt "set the status"
 msgid "Applied"
 msgstr ""
 
-#: coquille-revue.php:2226
+#: coquille-revue.php:2323
 msgctxt "set the status"
 msgid "Rejected"
 msgstr ""
 
-#: coquille-revue.php:2227
+#: coquille-revue.php:2324
 msgctxt "set the status"
 msgid "Archive"
 msgstr ""
 
-#: coquille-revue.php:2239
+#: coquille-revue.php:2336
 msgctxt "set the status back to pending"
 msgid "Restore"
 msgstr ""
 
-#: coquille-revue.php:2247
+#: coquille-revue.php:2344
 msgid "A thank-you email will be sent to the contributor. Continue?"
 msgstr ""
 
-#: coquille-revue.php:2271
+#: coquille-revue.php:2368
 msgctxt "annotation status"
 msgid "Pending"
 msgstr ""
 
-#: coquille-revue.php:2272
+#: coquille-revue.php:2369
 msgctxt "annotation status"
 msgid "In progress"
 msgstr ""
 
-#: coquille-revue.php:2273
+#: coquille-revue.php:2370
 msgctxt "annotation status"
 msgid "Applied"
 msgstr ""
 
-#: coquille-revue.php:2274
+#: coquille-revue.php:2371
 msgctxt "annotation status"
 msgid "Rejected"
 msgstr ""
 
-#: coquille-revue.php:2275
+#: coquille-revue.php:2372
 msgctxt "annotation status"
 msgid "Archived"
 msgstr ""
 
-#: coquille-revue.php:2279
+#: coquille-revue.php:2376
 msgid "web address"
 msgstr ""
 
-#: coquille-revue.php:2280
+#: coquille-revue.php:2377
 msgid "code or command"
 msgstr ""
 
-#: coquille-revue.php:2281
+#: coquille-revue.php:2378
 msgid "invisible characters"
 msgstr ""
 
-#: coquille-revue.php:2282
+#: coquille-revue.php:2379
 msgid "mixed alphabets"
 msgstr ""
 
-#: coquille-revue.php:2283
+#: coquille-revue.php:2380
 msgid "instruction or authority"
 msgstr ""
 
-#: coquille-revue.php:2284
+#: coquille-revue.php:2381
 msgid "added sentence"
 msgstr ""
 
-#: coquille-revue.php:2285
+#: coquille-revue.php:2382
 msgid "added symbols"
 msgstr ""
 
-#: coquille-revue.php:2286
+#: coquille-revue.php:2383
 msgid "unreadable text"
 msgstr ""
 
 #. translators: date and time format of the annotation table, see https://www.php.net/manual/datetime.format.php
-#: coquille-revue.php:2289
+#: coquille-revue.php:2386
 msgctxt "annotation table date format"
 msgid "Y/m/d g:i a"
 msgstr ""
 
-#: coquille-revue.php:2297
+#: coquille-revue.php:2394
 msgid "All annotations of this site have been deleted."
 msgstr ""
 
-#: coquille-revue.php:2298
+#: coquille-revue.php:2395
 msgid "Nothing was deleted: tick the confirmation box next to the “Delete all” button."
 msgstr ""
 
-#: coquille-revue.php:2299
+#: coquille-revue.php:2396
 msgid "Public mode is on: any visitor can now annotate."
 msgstr ""
 
-#: coquille-revue.php:2300
+#: coquille-revue.php:2397
 msgid "Private mode is on: only logged-in users (contributors and above) can annotate."
 msgstr ""
 
 #. translators: 1: name of the constant, 2: name of the configuration file
-#: coquille-revue.php:2302
+#: coquille-revue.php:2399
 #, php-format
 msgid "The mode is locked by %1$s in %2$s. Remove the constant to switch it from this page."
 msgstr ""
 
-#: coquille-revue.php:2303
+#: coquille-revue.php:2400
 msgid "Status updated."
 msgstr ""
 
 #. translators: %d: maximum number of thank-you emails per day for the site
-#: coquille-revue.php:2305
+#: coquille-revue.php:2402
 #, php-format
 msgid "Status updated, but the thank-you email was not sent: the daily limit is reached (one email per address, %d per site)."
 msgstr ""
 
-#: coquille-revue.php:2306
+#: coquille-revue.php:2403
 msgid "Status updated, but the thank-you email could not be sent: check the email sending of the site."
 msgstr ""
 
-#: coquille-revue.php:2309
+#: coquille-revue.php:2406
 msgid "Settings saved."
 msgstr ""
 
 #. translators: %s: "Private mode", in bold
-#: coquille-revue.php:2323
+#: coquille-revue.php:2420
 #, php-format
 msgid "%s — only logged-in users (contributors and above) can annotate."
 msgstr ""
 
-#: coquille-revue.php:2324
+#: coquille-revue.php:2421
 msgid "Private mode"
 msgstr ""
 
 #. translators: 1: "Public mode", in bold, 2: submissions per IP address, 3: number of minutes, 4: submissions per IP address and per hour, 5: anonymous submissions per hour for the site
-#: coquille-revue.php:2330
+#: coquille-revue.php:2427
 #, php-format
 msgid "%1$s — any visitor can annotate (per IP address, at most %2$d submissions in %3$d minutes and %4$d per hour; %5$d anonymous submissions per hour for the site; honeypot field against bots)."
 msgstr ""
 
-#: coquille-revue.php:2331
+#: coquille-revue.php:2428
 msgid "Public mode"
 msgstr ""
 
 #. translators: %s: name of the configuration file
-#: coquille-revue.php:2342
+#: coquille-revue.php:2439
 #, php-format
 msgid "Locked by %s"
 msgstr ""
 
-#: coquille-revue.php:2346
+#: coquille-revue.php:2443
 msgid "Set by the network administrator"
 msgstr ""
 
-#: coquille-revue.php:2352
+#: coquille-revue.php:2449
 msgid "Switch to public mode"
 msgstr ""
 
-#: coquille-revue.php:2352
+#: coquille-revue.php:2449
 msgid "Switch to private mode"
 msgstr ""
 
-#: coquille-revue.php:2362
+#: coquille-revue.php:2459
 msgid "Settings for this site"
 msgstr ""
 
 #. translators: 1: "Thank-you email", in bold, 2: maximum number of emails per day
-#: coquille-revue.php:2368
+#: coquille-revue.php:2465
 #, php-format
 msgid "%1$s: ask visitors for their email (optional) and let contributors know when their suggestion is applied (at most %2$d emails per day, one per address)."
 msgstr ""
 
-#: coquille-revue.php:2369
+#: coquille-revue.php:2466
 msgid "Thank-you email"
 msgstr ""
 
 #. translators: 1: "Credit", in bold, 2: author name
-#: coquille-revue.php:2378
+#: coquille-revue.php:2475
 #, php-format
 msgid "%1$s: show “Coquille Revue plugin · by %2$s” and a link to their website in the information popover of the pencil button."
 msgstr ""
 
-#: coquille-revue.php:2379
+#: coquille-revue.php:2476
 msgid "Credit"
 msgstr ""
 
-#: coquille-revue.php:2384
+#: coquille-revue.php:2481
 msgid "Save"
 msgstr ""
 
-#: coquille-revue.php:2390
+#: coquille-revue.php:2487
 msgid "Apply the corrections with Claude Code"
 msgstr ""
 
 #. translators: %s: the Claude Code command
-#: coquille-revue.php:2393
+#: coquille-revue.php:2490
 #, php-format
 msgid "Install the Coquille Revue plugin for Claude Code once, then run %s in the folder of the site. It works through WP-CLI (locally or over SSH): no password to create. Each correction is shown to you before it is applied, and waits for your approval."
 msgstr ""
 
-#: coquille-revue.php:2420
+#: coquille-revue.php:2517
 msgid "Export this tab:"
 msgstr ""
 
-#: coquille-revue.php:2422
+#: coquille-revue.php:2519
 msgid "CSV (spreadsheet)"
 msgstr ""
 
-#: coquille-revue.php:2423
+#: coquille-revue.php:2520
 msgid "JSON (Claude Code)"
 msgstr ""
 
-#: coquille-revue.php:2424
+#: coquille-revue.php:2521
 msgid "Markdown (reading)"
 msgstr ""
 
 #. translators: %s: number of annotations
-#: coquille-revue.php:2440
+#: coquille-revue.php:2537
 #, php-format
 msgid "Permanently delete the %s annotation of this site (cannot be undone)"
 msgid_plural "Permanently delete the %s annotations of this site (cannot be undone)"
@@ -702,49 +702,49 @@ msgstr[0] ""
 msgstr[1] ""
 
 #. translators: %s: number of annotations
-#: coquille-revue.php:2445
+#: coquille-revue.php:2542
 #, php-format
 msgid "Delete all (%s)"
 msgstr ""
 
-#: coquille-revue.php:2454
+#: coquille-revue.php:2551
 msgid "REST API endpoint:"
 msgstr ""
 
 #. translators: %s: number of annotations
-#: coquille-revue.php:2467
+#: coquille-revue.php:2564
 #, php-format
 msgid "%s annotation"
 msgid_plural "%s annotations"
 msgstr[0] ""
 msgstr[1] ""
 
-#: coquille-revue.php:2479
+#: coquille-revue.php:2576
 msgid "No annotations with this status."
 msgstr ""
 
-#: coquille-revue.php:2485
+#: coquille-revue.php:2582
 msgid "ID"
 msgstr ""
 
-#: coquille-revue.php:2493
+#: coquille-revue.php:2590
 msgid "Actions"
 msgstr ""
 
-#: coquille-revue.php:2524
+#: coquille-revue.php:2621
 msgid "Alerts:"
 msgstr ""
 
-#: coquille-revue.php:2533
+#: coquille-revue.php:2630
 msgctxt "annotation mode"
 msgid "area"
 msgstr ""
 
-#: coquille-revue.php:2533
+#: coquille-revue.php:2630
 msgctxt "annotation mode"
 msgid "text"
 msgstr ""
 
-#: coquille-revue.php:2537
+#: coquille-revue.php:2634
 msgid "not logged in"
 msgstr ""

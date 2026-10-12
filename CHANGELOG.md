@@ -2,7 +2,7 @@
 
 All notable changes to Coquille Revue. Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versions follow [Semantic Versioning](https://semver.org/). Entries are written in English from version 2.6.0 on.
 
-## [2.6.0] — Unreleased
+## [2.6.0] — 2026-10-12
 
 ### Breaking changes
 
