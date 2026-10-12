@@ -1,4 +1,4 @@
-/* Coquille Revue — page d'administration. Textes : contraste d'au moins 4,5:1 sur fond blanc et sur les lignes alternées. */
+/* Coquille Revue — admin page. Texts: contrast of at least 4.5:1 on a white background and on the striped rows. */
 .coquille-revue-admin .coquille-revue-version {
   margin-left: 8px;
   font-size: 12px;
@@ -22,7 +22,7 @@
   margin-top: -2px;
 }
 
-/* Bandeau public / privé et réglages */
+/* Public / private banner and settings */
 .coquille-revue-admin .coquille-revue-mode {
   display: flex;
   align-items: center;
@@ -52,7 +52,7 @@
   min-width: 260px;
 }
 
-/* Encart Claude Code */
+/* Claude Code box */
 .coquille-revue-admin .coquille-revue-claude {
   background: #f8fafc;
   border: 1px solid #e2e8f0;
@@ -82,7 +82,7 @@
   overflow-x: auto;
 }
 
-/* Exports et suppression */
+/* Exports and deletion */
 .coquille-revue-admin .coquille-revue-toolbar {
   display: flex;
   align-items: center;
@@ -123,8 +123,8 @@
   color: #aaa;
 }
 
-/* Tableau : largeurs fixes pour les colonnes courtes ; Page, Texte d'origine et Suggestion se partagent le reste.
-   Quand la place manque, le tableau défile horizontalement au lieu d'écraser ces trois colonnes. */
+/* Table: fixed widths for the short columns; Page, Original text and Suggestion share the rest.
+   When room is short, the table scrolls horizontally instead of squeezing these three columns. */
 .coquille-revue-admin .coquille-revue-table-wrap {
   overflow-x: auto;
 }
@@ -169,7 +169,7 @@
 .coquille-revue-admin .coquille-revue-suggestion {
   color: #155724;
 }
-/* Alertes, sous la suggestion */
+/* Alerts, under the suggestion */
 .coquille-revue-admin .coquille-revue-alerts {
   display: block;
   width: fit-content;
@@ -198,7 +198,7 @@
   color: #374151;
 }
 
-/* Statuts : mêmes couleurs pour le libellé et pour les boutons qui y mènent */
+/* Statuses: same colors for the label and for the buttons that lead to it */
 .coquille-revue-admin .coquille-status {
   font-weight: 600;
 }

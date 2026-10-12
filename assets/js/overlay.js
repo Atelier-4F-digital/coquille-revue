@@ -1,9 +1,9 @@
-/* Coquille Revue — interface publique. Configuration et textes : bloc JSON #coquille-revue-config, écrit par PHP. */
+/* Coquille Revue — public interface. Configuration and texts: JSON block #coquille-revue-config, written by PHP. */
 (function () {
   'use strict';
 
-  // Bloc de données jamais exécuté : il fonctionne sous une CSP stricte sans jeton. Fichier en cache plus récent ou plus
-  // ancien que la page (bloc absent ou illisible) : on ne fait rien plutôt que de casser la page.
+  // Data block that is never run: it works under a strict CSP without nonce. File in cache newer or older
+  // than the page (block missing or unreadable): do nothing rather than break the page.
   let cfg = null;
   try {
     cfg = JSON.parse(document.getElementById('coquille-revue-config').textContent);
@@ -16,7 +16,7 @@
   const PAGE_URL   = window.location.origin + window.location.pathname;
   const PAGE_TITLE = document.title;
 
-  // Remplace %s ou %1$s, %2$s… par les valeurs données (textes traduisibles côté PHP).
+  // Replaces %s or %1$s, %2$s… with the given values (translatable texts on the PHP side).
   function fmt(str, ...args) {
     let i = 0;
     return str.replace(/%(?:(\d+)\$)?s/g, (m, n) => String(args[n ? n - 1 : i++] ?? ''));
@@ -44,12 +44,12 @@
   let reviewModeActive = false;
   let currentAnnotation = null;
   let activeType = 'correction';
-  let smartDrag = null;     // { x, y, isDrag } : clic-glisser en cours sur une zone sans texte
-  let lastOverText = null;  // null = pas encore détecté
+  let smartDrag = null;     // { x, y, isDrag }: click-and-drag in progress over an area without text
+  let lastOverText = null;  // null = not detected yet
   let cursorThrottle = 0;
-  let lastPointerType = 'mouse'; // 'touch' : la sélection se fait au doigt (appui long, poignées)
+  let lastPointerType = 'mouse'; // 'touch': text is selected with a finger (long press, handles)
 
-  // Helpers pour le détecteur "sur du texte ou pas"
+  // Helpers for the "over text or not" detector
   function isPluginEl(el) {
     return !!(el && el.closest && el.closest('#coquille-revue-root'));
   }
@@ -73,8 +73,8 @@
     if (node.nodeType !== Node.TEXT_NODE) return false;
     if (!node.textContent || !node.textContent.trim()) return false;
 
-    // Vérifie que le point est vraiment SUR un glyphe (pas sur un padding adjacent).
-    // On mesure le rect du caractère le plus proche et exige une proximité < 6 px.
+    // Checks that the point is really ON a glyph (not on adjacent padding).
+    // Measures the rect of the nearest character and requires a distance below 6 px.
     try {
       const r = document.createRange();
       const safeOffset = Math.min(Math.max(offset, 0), node.textContent.length - 1);
@@ -86,7 +86,7 @@
       const dy = Math.max(rect.top - y, y - rect.bottom, 0);
       return dx < 6 && dy < 6;
     } catch (e) {
-      return true; // fallback prudent : on suppose qu'on est sur du texte
+      return true; // careful fallback: assume the pointer is over text
     }
   }
 
@@ -121,8 +121,8 @@
     return parts.join(' > ');
   }
 
-  // Bulle fixée en bas de l'écran, au-dessus de la barre, centrée sur ce qui est annoté (rect : coordonnées
-  // à l'écran) ; en haut si elle le cacherait et qu'il y a la place au-dessus. À droite, le crayon reste visible.
+  // Bubble fixed at the bottom of the screen, above the bar, centered on what is annotated (rect: coordinates
+  // on the screen); at the top when it would hide it and there is room above. On the right, the pencil stays visible.
   function positionBubble(rect) {
     const vw = window.innerWidth, vh = window.innerHeight;
     const bw = bubble.offsetWidth, bh = bubble.offsetHeight;
@@ -132,7 +132,7 @@
     bubble.classList.toggle('coquille-bubble-top', rect.bottom > vh - 56 - bh - 8 && rect.top > bh + 24);
   }
 
-  // Clavier virtuel ouvert : la zone visible rétrécit sans que la page bouge ; la bulle se place juste au-dessus.
+  // Virtual keyboard open: the visible area shrinks without the page moving; the bubble sits just above it.
   function fitBubbleToViewport() {
     const vv = window.visualViewport;
     if (!vv || !bubble.classList.contains('coquille-visible')) return;
@@ -151,7 +151,7 @@
     window.visualViewport.addEventListener('scroll', fitBubbleToViewport);
   }
 
-  // Au toucher, le champ ne prend pas le focus tout seul : le clavier cacherait la page et, sur iOS, effacerait la sélection.
+  // On touch, the field does not take the focus by itself: the keyboard would hide the page and, on iOS, erase the selection.
   function showBubble(rect, focusField) {
     bubble.classList.add('coquille-visible');
     positionBubble(rect);
@@ -159,8 +159,8 @@
     if (focusField) setTimeout(() => textarea.focus({ preventScroll: true }), 60);
   }
 
-  // Message annoncé par la zone live (role="status", ou "alert" pour une erreur, lue sans attendre) ;
-  // le texte est vidé une fois le message masqué.
+  // Message announced by the live region (role="status", or "alert" for an error, read at once);
+  // the text is emptied once the message is hidden.
   let toastTimer = null;
   function showToast(msg, type) {
     clearTimeout(toastTimer);
@@ -174,20 +174,20 @@
     }, type === 'error' ? 6000 : 3000);
   }
 
-  // Le focus qui était dans la bulle ou la barre revient au crayon quand elles disparaissent ;
-  // après un clic ailleurs dans la page, il reste là où la personne a cliqué.
+  // Focus that was in the bubble or the bar comes back to the pencil when they disappear;
+  // after a click elsewhere in the page, it stays where the person clicked.
   function focusIsIn(...els) {
     return els.some(el => el.contains(document.activeElement));
   }
-  let restoringFocus = false; // focus rendu par le script : n'ouvre pas la fenêtre d'information
+  let restoringFocus = false; // focus given back by the script: does not open the information popover
   function focusFab() {
     restoringFocus = true;
     fab.focus({ preventScroll: true });
     restoringFocus = false;
   }
 
-  // Surlignage propre à l'extension (CSS Custom Highlight API) : le passage choisi reste repéré dans la page quand
-  // le champ prend le focus, ce qui efface la sélection du navigateur. Sans cette API, la bulle cite le passage.
+  // The plugin's own highlight (CSS Custom Highlight API): the chosen passage stays marked in the page when
+  // the field takes the focus, which clears the browser selection. Without this API, the bubble quotes the passage.
   const canHighlight = !!(window.CSS && CSS.highlights && window.Highlight);
   function highlightSelection(range) {
     if (canHighlight) CSS.highlights.set('coquille-selection', new Highlight(range.cloneRange()));
@@ -226,13 +226,13 @@
     if (hadFocus) focusFab();
   }
 
-  // ── FAB : popover au survol ou au focus, clic lance la relecture ─────
+  // ── FAB: popover on hover or focus, click starts the review ──────────
   let popoverHideTimer = null;
   function showPopover() {
     clearTimeout(popoverHideTimer);
     if (!reviewModeActive) infoPop.classList.add('coquille-visible');
   }
-  // Ouverte au clavier, la fenêtre reste affichée tant que le focus est sur le crayon ou dans la fenêtre.
+  // Opened with the keyboard, the popover stays shown while the focus is on the pencil or in the popover.
   function keyboardFocusOnFab() {
     try { return fab.matches(':focus-visible'); } catch (e) { return false; }
   }
@@ -247,7 +247,7 @@
   infoPop.addEventListener('mouseenter', showPopover);
   infoPop.addEventListener('mouseleave', hidePopoverDelayed);
   fab.addEventListener('focus', () => { if (!restoringFocus) showPopover(); });
-  // Le focus peut passer du crayon à la fenêtre (Tab) sans la fermer.
+  // Focus can move from the pencil to the popover (Tab) without closing it.
   [fab, infoPop].forEach(el => el.addEventListener('focusout', (e) => {
     if (!infoPop.contains(e.relatedTarget) && e.relatedTarget !== fab) infoPop.classList.remove('coquille-visible');
   }));
@@ -263,11 +263,11 @@
     clearTimeout(popoverHideTimer);
     infoPop.classList.remove('coquille-visible');
     enterReviewMode();
-    focusFab(); // le bouton disparaît avec la fenêtre : le focus revient au crayon
+    focusFab(); // the button disappears with the popover: focus goes back to the pencil
   });
   stopBtn.addEventListener('click', () => exitReviewMode());
 
-  // ── Capture sélection texte ──────────────────────────────────────────
+  // ── Text selection capture ───────────────────────────────────────────
   function captureTextSelection() {
     const sel = window.getSelection();
     if (!sel || sel.isCollapsed || sel.toString().trim().length < 2) return false;
@@ -275,7 +275,7 @@
     const range = sel.getRangeAt(0);
     const text  = sel.toString().trim();
     const touch = lastPointerType === 'touch';
-    // Au toucher, ajuster les poignées met à jour la bulle déjà ouverte sans effacer la remarque.
+    // On touch, adjusting the handles updates the bubble already open without erasing the remark.
     const updating = touch && bubble.classList.contains('coquille-visible');
 
     currentAnnotation = {
@@ -302,10 +302,10 @@
     return true;
   }
 
-  // ── Capture d'une zone (rectangle drag) ──────────────────────────────
+  // ── Area capture (dragged rectangle) ─────────────────────────────────
   function captureZone(x, y, w, h) {
     const cx = x + w / 2, cy = y + h / 2;
-    // Trouve l'élément sous le centre (on est sûr qu'aucun overlay plein écran ne masque)
+    // Finds the element under the center (no full-screen overlay can hide it)
     const elBehind = document.elementFromPoint(cx, cy) || document.body;
 
     zoneHL.style.left = (x + window.scrollX) + 'px';
@@ -323,7 +323,7 @@
       xpath: getXPath(elBehind),
       cssSelector: getCssSelector(elBehind),
       charOffsetStart: 0, charOffsetEnd: 0,
-      originalText: elText || '(zone without text)', // valeur enregistrée : marqueur fixe, jamais traduit
+      originalText: elText || '(zone without text)', // stored value: fixed marker, never translated
       zoneData: {
         x: Math.round(x + window.scrollX), y: Math.round(y + window.scrollY),
         w: Math.round(w), h: Math.round(h),
@@ -343,10 +343,10 @@
     showBubble({ left: x, top: y, width: w, height: h, bottom: y + h }, true);
   }
 
-  // ── Logique unifiée : curseur intelligent + capture auto ─────────────
+  // ── Unified logic: smart cursor + automatic capture ──────────────────
   function updateCursorAt(x, y) {
     const el = document.elementFromPoint(x, y);
-    if (isPluginEl(el)) return; // ne pas toucher au curseur dans notre UI
+    if (isPluginEl(el)) return; // leave the cursor alone in our own UI
     const onText = isOverText(x, y);
     if (onText !== lastOverText) {
       document.body.classList.toggle('coquille-cursor-text', onText);
@@ -371,7 +371,7 @@
       }
       return;
     }
-    // Throttle à ~30 Hz
+    // Throttle at about 30 Hz
     const now = performance.now();
     if (now - cursorThrottle < 33) return;
     cursorThrottle = now;
@@ -379,26 +379,26 @@
   });
 
   document.addEventListener('mousedown', (e) => {
-    // Clic hors de la bulle ouverte : envoi automatique si une remarque est saisie, sinon fermeture.
-    // Aucune nouvelle zone ne démarre : la remarque en cours n'est jamais perdue.
+    // Click outside the open bubble: automatic sending when a remark is typed, otherwise closing.
+    // No new area starts: the remark in progress is never lost.
     if (bubble.classList.contains('coquille-visible') && !isPluginEl(e.target)) {
       autoSendOrClose();
       return;
     }
     if (!reviewModeActive || lastPointerType === 'touch') return;
     if (isPluginEl(e.target)) return;
-    // Si on clique sur du texte, on laisse le navigateur faire la sélection
+    // Click on text: the browser makes the selection
     if (isOverText(e.clientX, e.clientY)) return;
-    // Sinon, on amorce un drag potentiel pour capture de zone
+    // Otherwise, start a possible drag to capture an area
     smartDrag = { x: e.clientX, y: e.clientY, isDrag: false };
-    e.preventDefault(); // empêche les drag images / sélections parasites
+    e.preventDefault(); // prevents drag images and stray selections
   });
 
   document.addEventListener('mouseup', (e) => {
     if (!reviewModeActive || lastPointerType === 'touch') return;
     if (isPluginEl(e.target)) { smartDrag = null; return; }
 
-    // Cas 1 : on a fait un drag de zone
+    // Case 1: an area was dragged
     if (smartDrag && smartDrag.isDrag) {
       const x = Math.min(smartDrag.x, e.clientX);
       const y = Math.min(smartDrag.y, e.clientY);
@@ -411,11 +411,11 @@
     }
     smartDrag = null;
 
-    // Cas 2 : pas de drag → on regarde si une sélection texte existe
+    // Case 2: no drag → check whether a text selection exists
     captureTextSelection();
   });
 
-  // Intercepte tous les clics en mode revue pour bloquer la navigation
+  // Catches every click in review mode to block navigation
   document.addEventListener('click', (e) => {
     if (!reviewModeActive) return;
     if (isPluginEl(e.target)) return;
@@ -423,8 +423,8 @@
     e.stopPropagation();
   }, true);
 
-  // Tactile : sélection de texte seulement (appui long, puis poignées). La bulle s'ouvre ou se met à jour
-  // une fois la sélection stable ; les événements souris simulés après un toucher sont ignorés.
+  // Touch: text selection only (long press, then handles). The bubble opens or is updated
+  // once the selection is stable; mouse events simulated after a touch are ignored.
   let selectionTimer = null;
   document.addEventListener('pointerdown', (e) => { lastPointerType = e.pointerType || 'mouse'; }, true);
   document.addEventListener('selectionchange', () => {
@@ -436,21 +436,21 @@
     }, 600);
   });
 
-  // ── Type d'annotation : « Correction » à chaque nouvelle bulle ───────
+  // ── Type of remark: "Correction" for each new bubble ─────────────────
   function setType(type) {
     activeType = type;
     typeButtons.forEach(b => b.setAttribute('aria-pressed', String(b.dataset.type === type)));
   }
   typeButtons.forEach(btn => btn.addEventListener('click', () => setType(btn.dataset.type)));
 
-  // ── Envoi ────────────────────────────────────────────────────────────
+  // ── Sending ──────────────────────────────────────────────────────────
   let sending = false;
   async function sendAnnotation() {
     if (sending) return false;
     if (!currentAnnotation || textarea.value.trim().length < 2) { textarea.focus(); return false; }
     sending = true;
 
-    // Mêmes longueurs maximales que le serveur
+    // Same maximum lengths as the server
     const max = cfg.maxLengths;
     const cut = (s, n) => (s || '').slice(0, n);
     const payload = {
@@ -460,13 +460,13 @@
       originalText: cut(currentAnnotation.originalText, max.originalText), suggestion: textarea.value.trim(),
       type: activeType,
       annotationMode: currentAnnotation.mode, zoneData: currentAnnotation.zoneData || null,
-      // Champs vides omis : le serveur n'a rien à nettoyer
+      // Empty fields left out: the server has nothing to sanitize
       reviewerName: reviewerName?.value.trim() || undefined,
       reviewerEmail: reviewerEmail?.value.trim() || undefined,
-      hp: honeypot.value, // doit rester vide
+      hp: honeypot.value, // must stay empty
     };
 
-    // Validation email côté client (si renseigné)
+    // Email check on the client side (when given)
     if (payload.reviewerEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(payload.reviewerEmail)) {
       reviewerEmail.setAttribute('aria-invalid', 'true');
       reviewerEmail.focus();
@@ -488,14 +488,14 @@
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        // Champ trop long : 400 rest_invalid_param, avec le code rest_too_long dans le détail du champ.
+        // Field too long: 400 rest_invalid_param, with the rest_too_long code in the details of the field.
         const tooLong = res.status === 400 && err.code === 'rest_invalid_param'
           && Object.values((err.data && err.data.details) || {}).some(d => d && d.code === 'rest_too_long');
         const messages = { 429: t.errorRateLimited, 401: t.errorLoginRequired, 403: t.errorForbidden };
         throw new Error((tooLong && t.errorTooLong) || messages[res.status] || err.message || fmt(t.errorGeneric, res.status));
       }
       showToast(t.sent, 'success');
-      exitReviewMode(); // sortie automatique du mode après envoi réussi
+      exitReviewMode(); // review mode ends automatically after a successful sending
       return true;
     } catch (err) {
       showToast(err.message, 'error');
@@ -508,7 +508,7 @@
   }
   sendBtn.addEventListener('click', sendAnnotation);
 
-  // Auto-envoi sur Enter (Shift+Enter = saut de ligne classique)
+  // Automatic sending on Enter (Shift+Enter = ordinary line break)
   textarea.addEventListener('keydown', (e) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
@@ -520,7 +520,7 @@
   document.getElementById('coquille-bubble-close').addEventListener('click', () => closeBubble());
 
   document.addEventListener('keydown', (e) => {
-    // Échap déjà utilisé par le thème (menu, fenêtre) : on n'y touche pas.
+    // Escape already used by the theme (menu, dialog): left alone.
     if (e.key === 'Escape' && !e.defaultPrevented) {
       if (bubble.classList.contains('coquille-visible')) closeBubble();
       else if (reviewModeActive) exitReviewMode();
@@ -530,28 +530,28 @@
         if (hadFocus) focusFab();
       }
     }
-    // Annotation au clavier : en mode relecture, une sélection faite au clavier (navigation au curseur, F7) puis Entrée.
+    // Annotation with the keyboard: in review mode, a selection made with the keyboard (caret browsing, F7) then Enter.
     if (e.key === 'Enter' && reviewModeActive && !bubble.classList.contains('coquille-visible') && !isPluginEl(e.target) && !isTyping(e.target)) {
       const sel = window.getSelection();
       if (sel && !sel.isCollapsed && !isPluginEl(nodeEl(sel.anchorNode)) && captureTextSelection()) e.preventDefault();
     }
-    // Alt+Maj+C (Option+Maj+C sur Mac, d'où e.code) : personnes connectées seulement, jamais pendant une saisie.
+    // Alt+Shift+C (Option+Shift+C on Mac, hence e.code): logged-in users only, never while typing.
     if (cfg.shortcut && e.altKey && e.shiftKey && !e.ctrlKey && !e.metaKey && e.code === 'KeyC' && !isTyping(e.target)) {
       e.preventDefault();
       reviewModeActive ? exitReviewMode() : enterReviewMode();
     }
   });
 
-  // Auto-envoi sur fermeture si du texte est saisi (sinon, on ferme juste)
+  // Automatic sending on closing when some text is typed (otherwise, just close)
   function autoSendOrClose() {
     if (currentAnnotation && textarea.value.trim().length >= 2) {
-      sendAnnotation(); // ferme automatiquement après succès
+      sendAnnotation(); // closes automatically after success
     } else {
       closeBubble();
     }
   }
 
-  // Tout est prêt : le crayon peut s'afficher. Si le script ne tourne pas (CSP stricte sans jeton, script retardé
-  // ou cassé par un outil d'optimisation), aucun bouton inerte n'est montré.
+  // Everything is ready: the pencil can be shown. If the script does not run (strict CSP, script delayed
+  // or broken by an optimization tool), no inert button is shown.
   document.getElementById('coquille-revue-root').classList.add('coquille-ready');
 })();

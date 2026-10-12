@@ -1,7 +1,7 @@
 <?php
-// Suppression de l'extension depuis l'administration : efface la table des annotations (commune au réseau),
-// les réglages et les tâches planifiées de chaque site. La simple désactivation, elle, garde tout.
-// Les compteurs anti-spam (transients) expirent seuls en un jour au plus, et WordPress efface les transients expirés.
+// Deleting the plugin from the admin: erases the annotations table (shared by the network),
+// the settings and the scheduled tasks of each site. Deactivating it keeps everything.
+// The anti-spam counters (transients) expire by themselves within a day, and WordPress erases expired transients.
 defined('WP_UNINSTALL_PLUGIN') || exit;
 
 global $wpdb;

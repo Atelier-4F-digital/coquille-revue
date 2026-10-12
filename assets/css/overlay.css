@@ -1,6 +1,6 @@
-/* Coquille Revue — interface publique. Tout est rangé dans #coquille-revue-root (sans position ni transform :
-   la surbrillance de zone, en position absolue, se place par rapport au document).
-   Textes : contraste d'au moins 4,5:1 ; bords des champs et repères de focus : au moins 3:1. */
+/* Coquille Revue — public interface. Everything sits in #coquille-revue-root (no position nor transform:
+   the area highlight, absolutely positioned, is placed relative to the document).
+   Texts: contrast of at least 4.5:1; field borders and focus indicators: at least 3:1. */
 #coquille-revue-root {
   --coquille-bg: #111;
   --coquille-field: #1a1a1a;
@@ -17,7 +17,7 @@
     -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif !important;
 }
 
-/* Texte réservé aux lecteurs d'écran */
+/* Text for screen readers only */
 #coquille-revue-root .coquille-sr-only {
   position: absolute !important;
   width: 1px;
@@ -29,7 +29,7 @@
   white-space: nowrap;
   border: 0;
 }
-/* Icônes SVG décoratives, à la taille du texte */
+/* Decorative SVG icons, at the size of the text */
 #coquille-revue-root .coquille-icon {
   width: 1.15em;
   height: 1.15em;
@@ -37,7 +37,7 @@
   vertical-align: -0.2em;
 }
 
-/* Focus visible partout ; anneau double sur le crayon, lisible sur un fond clair comme sombre */
+/* Visible focus everywhere; double ring on the pencil, readable on a light as well as a dark background */
 #coquille-revue-root :focus-visible {
   outline: 2px solid var(--coquille-accent);
   outline-offset: 2px;
@@ -53,7 +53,7 @@
     0 10px 32px rgba(0, 0, 0, 0.35);
 }
 
-/* ── Icône flottante (FAB) — crayon SVG ── */
+/* ── Floating button (FAB) — SVG pencil ── */
 #coquille-fab {
   position: fixed;
   bottom: 24px;
@@ -76,7 +76,7 @@
     box-shadow 0.15s,
     background 0.15s;
 }
-/* Crayon affiché seulement une fois le script prêt (classe ajoutée par overlay.js) : sans script, pas de bouton inerte. */
+/* Pencil shown only once the script is ready (class added by overlay.js): without the script, no inert button. */
 #coquille-revue-root:not(.coquille-ready) #coquille-fab {
   display: none;
 }
@@ -95,7 +95,7 @@
   display: block;
 }
 
-/* ── Popover info (survol ou focus du crayon) ── */
+/* ── Information popover (hover or focus of the pencil) ── */
 #coquille-info-popover {
   position: fixed;
   bottom: 88px;
@@ -186,7 +186,7 @@
   text-decoration: underline;
 }
 
-/* ── Barre de contrôles (visible uniquement en mode actif) ── */
+/* ── Control bar (visible only while review mode is on) ── */
 #coquille-bar {
   position: fixed;
   bottom: 0;
@@ -285,9 +285,9 @@ body.coquille-mode-active #coquille-bar {
   color: #fff;
 }
 
-/* ── Bulle d'annotation ── */
-/* Fixée à l'écran, juste au-dessus de la barre (ou en haut, classe coquille-bubble-top) :
-   elle reste visible quelle que soit la position dans la page. */
+/* ── Annotation bubble ── */
+/* Fixed on the screen, just above the bar (or at the top, class coquille-bubble-top):
+   it stays visible whatever the position in the page. */
 #coquille-bubble {
   position: fixed;
   z-index: 2147483645;
@@ -491,7 +491,7 @@ body.coquille-mode-active #coquille-bar {
   color: #fff;
 }
 
-/* Honeypot (champ caché anti-bot) */
+/* Honeypot (hidden anti-bot field) */
 #coquille-hp {
   position: absolute;
   left: -9999px;
@@ -501,7 +501,7 @@ body.coquille-mode-active #coquille-bar {
   pointer-events: none;
 }
 
-/* ── Toast (zone annoncée aux lecteurs d'écran) ── */
+/* ── Toast (region announced to screen readers) ── */
 #coquille-toast {
   position: fixed;
   bottom: 90px;
@@ -534,7 +534,7 @@ body.coquille-mode-active #coquille-bar {
   color: #fca5a5;
 }
 
-/* ── GEL DE PAGE en mode revue ── */
+/* ── PAGE FREEZE in review mode ── */
 #coquille-page-dim {
   position: fixed;
   inset: 0;
@@ -547,13 +547,13 @@ body.coquille-mode-active #coquille-page-dim {
   display: block;
 }
 
-/* En mode revue, on garde tout sélectionnable (texte dans les liens compris),
-   mais on intercepte les clics via JS pour bloquer la navigation. */
+/* In review mode, everything stays selectable (text inside links included),
+   but clicks are caught in JavaScript to block navigation. */
 body.coquille-mode-active ::selection {
   background: rgba(250, 204, 21, 0.35);
 }
 
-/* Curseur intelligent : I-beam sur du texte, crosshair sur les zones vides */
+/* Smart cursor: I-beam over text, crosshair over empty areas */
 body.coquille-mode-active.coquille-cursor-text,
 body.coquille-mode-active.coquille-cursor-text * {
   cursor: text !important;
@@ -562,7 +562,7 @@ body.coquille-mode-active.coquille-cursor-zone,
 body.coquille-mode-active.coquille-cursor-zone * {
   cursor: crosshair !important;
 }
-/* L'UI du plugin garde toujours son propre curseur */
+/* The UI of the plugin always keeps its own cursor */
 body.coquille-mode-active #coquille-revue-root * {
   cursor: auto !important;
 }
@@ -602,13 +602,13 @@ body.coquille-mode-active #coquille-revue-root textarea {
   display: block;
 }
 
-/* Passage choisi, toujours repéré dans la page quand la bulle est ouverte (CSS Custom Highlight API) */
+/* Chosen passage, still marked in the page while the bubble is open (CSS Custom Highlight API) */
 ::highlight(coquille-selection) {
   background-color: #facc15;
   color: #111;
 }
 
-/* En mode relecture, le crayon et les messages passent au-dessus de la barre (sinon ils cachent « Arrêter »). */
+/* In review mode, the pencil and the messages move above the bar (otherwise they hide "Stop"). */
 body.coquille-mode-active #coquille-fab {
   bottom: 64px;
 }
@@ -638,8 +638,8 @@ body.coquille-mode-active #coquille-toast {
   }
 }
 
-/* Écran tactile : pas de sélection de zone, consignes adaptées, cibles plus grandes,
-   champs en 16 px (en dessous, iOS agrandit la page à la saisie). */
+/* Touch screen: no area selection, adapted instructions, larger targets,
+   fields at 16 px (below that, iOS zooms the page in when typing). */
 @media (hover: none) and (pointer: coarse) {
   #coquille-revue-root .coquille-hint-zone,
   #coquille-revue-root .coquille-help-keys {
@@ -667,7 +667,7 @@ body.coquille-mode-active #coquille-toast {
   }
 }
 
-/* Réglage « réduire les animations » du système */
+/* System setting "reduce motion" */
 @media (prefers-reduced-motion: reduce) {
   #coquille-revue-root *,
   #coquille-revue-root *::before,
