@@ -5,6 +5,10 @@
 # archive of wordpress-develop. Replace the whole file to update it. Always pass skip-database-creation=true
 # and WP_INSTALL_TESTS_SKIP_UPDATE_CHECK=true (bin/test-local.sh and the CI do).
 # See https://raw.githubusercontent.com/wp-cli/scaffold-command/master/templates/install-wp-tests.sh
+#
+# Local change, to keep when the file is replaced: the WordPress release archive is checked against the SHA-1
+# checksum that wordpress.org publishes next to it (verify_sha1; wordpress.org publishes no SHA-256). The nightly
+# archive and the test suite are GitHub archives of wordpress-develop: GitHub publishes no checksum for them.
 
 # Set up colors for output
 RED="\033[0;31m"
@@ -43,6 +47,21 @@ download() {
         echo -e "${RED}Error: Neither curl nor wget is installed.${RESET}"
         exit 1
     fi
+}
+
+verify_sha1() {
+	local expected actual
+	expected=$(tr -dc '0-9a-f' < "$2" | head -c 40)
+	if command -v sha1sum > /dev/null 2>&1; then
+		actual=$(sha1sum "$1" | awk '{print $1}')
+	else
+		actual=$(shasum -a 1 "$1" | awk '{print $1}')
+	fi
+	if [ ${#expected} -ne 40 ] || [ "$expected" != "$actual" ]; then
+		echo -e "${RED}Error:${RESET} SHA-1 of $1 is $actual, wordpress.org publishes ${expected:-nothing}: archive refused."
+		exit 1
+	fi
+	echo -e "${GREEN}SHA-1 checksum of $1 matches wordpress.org.${RESET}"
 }
 
 check_for_updates() {
@@ -155,6 +174,8 @@ install_wp() {
 			local ARCHIVE_NAME="wordpress-$WP_VERSION"
 		fi
 		download https://wordpress.org/${ARCHIVE_NAME}.tar.gz  $TMPDIR/wordpress.tar.gz
+		download https://wordpress.org/${ARCHIVE_NAME}.tar.gz.sha1 $TMPDIR/wordpress.tar.gz.sha1
+		verify_sha1 $TMPDIR/wordpress.tar.gz $TMPDIR/wordpress.tar.gz.sha1
 		tar --strip-components=1 -zxmf $TMPDIR/wordpress.tar.gz -C $WP_CORE_DIR
 	fi
 	echo -e "${GREEN}WordPress installed successfully.${RESET}"

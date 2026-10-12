@@ -45,7 +45,7 @@ vendor/bin/phpunit && vendor/bin/phpunit --group isolated
 WP_MULTISITE=1 vendor/bin/phpunit && WP_MULTISITE=1 vendor/bin/phpunit --group isolated
 ```
 
-`bin/install-wp-tests.sh` (copie épinglée du modèle de WP-CLI, sans svn) télécharge WordPress et sa suite de tests dans le dossier temporaire (variables `WP_CORE_DIR` et `WP_TESTS_DIR`). Le dernier argument `true` saute la création de la base ; `latest` peut être remplacé par une version (`6.2`, `7.1.3`) ou par `trunk`.
+`bin/install-wp-tests.sh` (copie épinglée du modèle de WP-CLI, sans svn) télécharge WordPress et sa suite de tests dans le dossier temporaire (variables `WP_CORE_DIR` et `WP_TESTS_DIR`). Il vérifie l'archive de WordPress avec l'empreinte SHA-1 que publie wordpress.org (qui ne publie pas de SHA-256) ; l'archive « nightly » et la suite de tests viennent d'archives GitHub, pour lesquelles aucune empreinte n'est publiée. Le dernier argument `true` saute la création de la base ; `latest` peut être remplacé par une version (`6.2`, `7.1.3`) ou par `trunk`.
 
 Sous Windows avec [Local](https://localwp.com/), depuis Git Bash et sans Docker :
 
@@ -72,9 +72,9 @@ bash bin/test-local.sh --filter Alerts
 
 ### Intégration continue
 
-`.github/workflows/ci.yml` (GitHub Actions) tourne à chaque envoi sur `main` et à chaque Pull Request : syntaxe PHP de 7.4 à 8.4, PHPCS, validité des fichiers JSON, syntaxe JavaScript (`node --check`) et shell (`bash -n`), PHPUnit (passage principal et groupe `isolated`) avec MySQL 8.4 (PHP 7.4 et WordPress 6.2, PHP 8.3 et WordPress 7.1, et WordPress 7.1 en multisite), et Plugin Check sur le contenu réel du zip (seules les erreurs bloquent). Les actions sont épinglées par SHA de commit, version en commentaire : pour en mettre une à jour, changez le SHA et le commentaire ensemble.
+`.github/workflows/ci.yml` (GitHub Actions) tourne à chaque envoi sur `main` et à chaque Pull Request : syntaxe PHP de 7.4 à 8.4, PHPCS, validité des fichiers JSON, syntaxe JavaScript (`node --check`) et shell (`bash -n`), PHPUnit (passage principal et groupe `isolated`) avec MySQL 8.4, image épinglée par son empreinte sha256 (PHP 7.4 et WordPress 6.2, PHP 8.3 et WordPress 7.1, et WordPress 7.1 en multisite), et Plugin Check sur le contenu réel du zip (seules les erreurs bloquent). Les actions sont épinglées par SHA de commit, version en commentaire : pour en mettre une à jour, changez le SHA et le commentaire ensemble.
 
-Sur un tag `vX.Y.Z`, une fois tout au vert, le job `release` vérifie que le tag, l'en-tête `Version` et la constante `COQUILLE_REVUE_VERSION` sont identiques, puis crée une release **en brouillon** avec `coquille-revue-X.Y.Z.zip`, `coquille-revue.zip` (nom fixe, utilisé par le lien Playground) et la section du CHANGELOG. La publication reste manuelle ; une release qui existe déjà n'est jamais modifiée.
+Sur un tag `vX.Y.Z`, une fois tout au vert, le job `release` vérifie que le tag, l'en-tête `Version` et la constante `COQUILLE_REVUE_VERSION` sont identiques, et que `CHANGELOG.md` n'a plus de section « Unreleased » (datez la version avant d'étiqueter), puis crée une release **en brouillon** avec `coquille-revue-X.Y.Z.zip`, `coquille-revue.zip` (nom fixe, utilisé par le lien Playground) et la section du CHANGELOG. La publication reste manuelle ; une release qui existe déjà n'est jamais modifiée.
 
 ## Règles du code
 

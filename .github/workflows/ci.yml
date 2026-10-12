@@ -78,7 +78,9 @@ jobs:
           - { php: "8.3", wp: "7.1", multisite: "1" }
     services:
       mysql:
-        image: mysql:8.4.11
+        # Pinned by digest (multi-architecture index of the 8.4.11 tag), version in the tag. To update: take the
+        # "digest" of https://hub.docker.com/v2/repositories/library/mysql/tags/<version>, change both together.
+        image: mysql:8.4.11@sha256:6ea90827b1100f8f2ae306a539f86d2c264a26ed435a2a9f75551dd5c3aeb242
         env:
           MYSQL_ROOT_PASSWORD: root
           MYSQL_DATABASE: wordpress_tests
@@ -150,6 +152,12 @@ jobs:
           constant=$(sed -n "s/^const COQUILLE_REVUE_VERSION *= *'\([^']*\)'.*/\1/p" coquille-revue.php)
           if [ "$tag" != "$header" ] || [ "$tag" != "$constant" ]; then
             echo "::error::Tag v$tag, header Version $header, COQUILLE_REVUE_VERSION $constant: all three must match."
+            exit 1
+          fi
+      - name: The changelog has no Unreleased section
+        run: |
+          if grep -niE '^## .*unreleased' CHANGELOG.md; then
+            echo "::error::CHANGELOG.md still has a section marked Unreleased: date the version (## [X.Y.Z] — YYYY-MM-DD) before tagging."
             exit 1
           fi
       - name: Build the zips and the release notes
