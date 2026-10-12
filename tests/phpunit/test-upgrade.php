@@ -29,25 +29,34 @@ class Test_Coquille_Revue_Upgrade extends Coquille_Revue_Test_Case {
         $this->assertArrayNotHasKey('html', $zone);
     }
 
-    // Version 4: dates of the rows written before 2.6.0 (MySQL clock) move to UTC with the offset of the MySQL clock,
-    // once only, even when the upgrade runs again; "Anonyme" stored for a visitor without a name becomes empty.
-    public function test_upgrade_to_version_4_converts_legacy_dates_once() {
+    // Upgrade from version 3 with the MySQL clock set to $mysql_zone, run twice (the second run stands for an upgrade
+    // that was interrupted, then started again).
+    private function upgrade_from_version_3($mysql_zone) {
         global $wpdb;
-        $legacy  = $this->insert_annotation(['dates_utc' => 0, 'created_at' => '2026-05-28 20:44:13', 'applied_at' => '2026-05-29 08:00:00', 'status' => 'applied', 'author_name' => 'Anonyme', 'reviewer_name' => null]);
-        $pending = $this->insert_annotation(['dates_utc' => 0, 'created_at' => '2026-05-28 21:03:56', 'author_id' => 7, 'author_name' => 'Anonyme']);
-        $recent  = $this->insert_annotation(['created_at' => '2026-10-11 18:00:00']);
-
         $zone = $wpdb->get_var('SELECT @@session.time_zone');
-        $wpdb->query("SET time_zone = '+05:30'");
-        foreach (['3', '3'] as $run) { // the second run stands for an upgrade that was interrupted, then started again
+        $wpdb->query($wpdb->prepare('SET time_zone = %s', $mysql_zone));
+        foreach (['3', '3'] as $run) {
             update_site_option('coquille_revue_db_version', $run);
             coquille_revue_maybe_upgrade();
         }
         $wpdb->query($wpdb->prepare('SET time_zone = %s', $zone));
+    }
+
+    // Version 4: created_at of the rows written before 2.6.0 (MySQL clock) moves to UTC with the offset of the MySQL
+    // clock, applied_at (site time zone) with the time zone of the site, once only, even when the upgrade runs again;
+    // "Anonyme" stored for a visitor without a name becomes empty.
+    public function test_upgrade_to_version_4_converts_legacy_dates_once() {
+        update_option('timezone_string', '');
+        update_option('gmt_offset', 0);
+        $legacy  = $this->insert_annotation(['dates_utc' => 0, 'created_at' => '2026-05-28 20:44:13', 'applied_at' => '2026-05-29 08:00:00', 'status' => 'applied', 'author_name' => 'Anonyme', 'reviewer_name' => null]);
+        $pending = $this->insert_annotation(['dates_utc' => 0, 'created_at' => '2026-05-28 21:03:56', 'author_id' => 7, 'author_name' => 'Anonyme']);
+        $recent  = $this->insert_annotation(['created_at' => '2026-10-11 18:00:00']);
+
+        $this->upgrade_from_version_3('+05:30');
 
         $this->assertSame('4', get_site_option('coquille_revue_db_version'));
         $row = $this->get_annotation($legacy);
-        $this->assertSame(['2026-05-28 15:14:13', '2026-05-29 02:30:00', '1'], [$row['created_at'], $row['applied_at'], $row['dates_utc']]);
+        $this->assertSame(['2026-05-28 15:14:13', '2026-05-29 08:00:00', '1'], [$row['created_at'], $row['applied_at'], $row['dates_utc']], 'site in UTC: applied_at unchanged');
         $this->assertSame('', $row['author_name'], 'visitor without a name');
         $row = $this->get_annotation($pending);
         $this->assertSame(['2026-05-28 15:33:56', null], [$row['created_at'], $row['applied_at']]);
@@ -56,6 +65,21 @@ class Test_Coquille_Revue_Upgrade extends Coquille_Revue_Test_Case {
 
         // The marker stays out of the API and of the exports.
         $this->assertArrayNotHasKey('dates_utc', coquille_revue_get_rows('applied')[0]);
+    }
+
+    // 2.5.0 wrote applied_at with current_time('mysql'), in the site time zone: with MySQL in UTC and a site in Paris
+    // (the usual case on a host), it moves by the offset of the site on that date, summer or winter time.
+    public function test_upgrade_to_version_4_converts_applied_at_with_the_site_time_zone() {
+        update_option('timezone_string', 'Europe/Paris');
+        $summer = $this->insert_annotation(['dates_utc' => 0, 'created_at' => '2026-09-01 12:00:00', 'applied_at' => '2026-09-01 14:00:00', 'status' => 'applied']);
+        $winter = $this->insert_annotation(['dates_utc' => 0, 'created_at' => '2026-01-15 12:30:00', 'applied_at' => '2026-01-15 14:00:00', 'status' => 'applied']);
+
+        $this->upgrade_from_version_3('+00:00');
+
+        $this->assertSame(['2026-09-01 12:00:00', '2026-09-01 12:00:00', '1'], array_values(array_intersect_key($this->get_annotation($summer), array_flip(['created_at', 'applied_at', 'dates_utc']))));
+        $this->assertSame(['2026-01-15 12:30:00', '2026-01-15 13:00:00'], array_values(array_intersect_key($this->get_annotation($winter), array_flip(['created_at', 'applied_at']))));
+        // The exports show the time of the site again, as 2.5.0 had stored it.
+        $this->assertSame('2026-09-01 14:00:00', coquille_revue_json_row($this->get_annotation($summer))['applied_at']);
     }
 
     public function test_new_annotations_are_marked_as_utc() {

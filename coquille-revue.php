@@ -115,8 +115,8 @@ function coquille_revue_table() {
 }
 
 // Dates stored in UTC (created_at, applied_at), shown and exported in the site time zone, translated.
-// Annotations older than version 2.6.0, dated with the clock of the MySQL server, are converted by the upgrade
-// of the database to version 4.
+// Annotations older than version 2.6.0, dated with the clock of the MySQL server (created_at) and in the site time
+// zone (applied_at), are converted by the upgrade of the database to version 4.
 function coquille_revue_local_date($utc, $format = 'Y-m-d H:i:s') {
     $time = $utc ? strtotime($utc . ' UTC') : false;
     return $time ? (string) wp_date($format, $time) : '';
@@ -173,10 +173,10 @@ function coquille_revue_maybe_upgrade() {
         if ($installed && version_compare($installed, '3', '<')) {
             coquille_revue_clean_legacy_rows();
         }
+        coquille_revue_assign_blog_ids(); // before version 4: the time zone of applied_at is the one of the row's site
         if ($installed && version_compare($installed, '4', '<')) {
             coquille_revue_upgrade_dates_and_names();
         }
-        coquille_revue_assign_blog_ids();
         update_site_option('coquille_revue_db_version', COQUILLE_REVUE_DB_VERSION);
     }
     coquille_revue_schedule_events();
@@ -227,10 +227,13 @@ function coquille_revue_clean_legacy_rows() {
     }
 }
 
-// Version 4: created_at and applied_at of the rows written before 2.6.0, with the clock of the MySQL server, move to UTC
-// with the MySQL offset at the time of the upgrade (so a winter date keeps the summer time offset). Each
-// row is converted and marked (dates_utc = 1) in the same query: an upgrade interrupted then started again never
-// converts a row twice. A visitor without a name is no longer stored as "Anonyme" (translated on display).
+// Version 4: the dates of the rows written before 2.6.0 move to UTC. created_at came from the clock of the MySQL server
+// (CURRENT_TIMESTAMP): it moves with the offset of that clock at the time of the upgrade (so a winter date keeps the
+// summer time offset). applied_at was written in the time zone of the site (current_time('mysql')): it moves with the
+// time zone of the row's site, date by date (summer and winter time); a row of no known site takes the time zone
+// of the current site. Each row is converted and marked (dates_utc = 1) in the same query: an upgrade interrupted
+// then started again never converts a row twice. A visitor without a name is no longer stored as "Anonyme"
+// (translated on display).
 function coquille_revue_upgrade_dates_and_names() {
     global $wpdb;
     $table = coquille_revue_table();
@@ -238,9 +241,27 @@ function coquille_revue_upgrade_dates_and_names() {
     $offset = (int) $wpdb->get_var('SELECT TIMESTAMPDIFF(SECOND, UTC_TIMESTAMP(), NOW())');
     // phpcs:ignore WordPress.DB.DirectDatabaseQuery -- plugin table, one-off migration.
     $wpdb->query($wpdb->prepare(
-        'UPDATE %i SET created_at = created_at - INTERVAL %d SECOND, applied_at = applied_at - INTERVAL %d SECOND, dates_utc = 1 WHERE dates_utc = 0',
-        $table, $offset, $offset
+        'UPDATE %i SET created_at = created_at - INTERVAL %d SECOND, dates_utc = 1 WHERE dates_utc = 0 AND applied_at IS NULL',
+        $table, $offset
     ));
+    $by_site = [];
+    // phpcs:ignore WordPress.DB.DirectDatabaseQuery -- plugin table, one-off migration.
+    foreach ($wpdb->get_results($wpdb->prepare('SELECT id, blog_id, applied_at FROM %i WHERE dates_utc = 0', $table), ARRAY_A) as $row) {
+        $by_site[(int) $row['blog_id']][] = $row;
+    }
+    foreach ($by_site as $blog_id => $rows) {
+        $switch = is_multisite() && $blog_id > 0 && $blog_id !== get_current_blog_id() && get_site($blog_id);
+        if ($switch) switch_to_blog($blog_id);
+        $applied = array_map(fn($row) => get_gmt_from_date($row['applied_at']) ?: $row['applied_at'], $rows);
+        if ($switch) restore_current_blog();
+        foreach ($rows as $i => $row) {
+            // phpcs:ignore WordPress.DB.DirectDatabaseQuery -- plugin table, one-off migration.
+            $wpdb->query($wpdb->prepare(
+                'UPDATE %i SET created_at = created_at - INTERVAL %d SECOND, applied_at = %s, dates_utc = 1 WHERE id = %d AND dates_utc = 0',
+                $table, $offset, $applied[$i], (int) $row['id']
+            ));
+        }
+    }
     // phpcs:ignore WordPress.DB.DirectDatabaseQuery -- plugin table, one-off migration.
     $wpdb->query($wpdb->prepare("UPDATE %i SET author_name = '' WHERE author_id = 0 AND author_name = %s", $table, 'Anonyme'));
 }

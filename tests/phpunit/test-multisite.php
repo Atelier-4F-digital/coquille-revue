@@ -86,6 +86,31 @@ class Test_Coquille_Revue_Multisite extends Coquille_Revue_Test_Case {
         $this->assertNotNull($this->get_annotation($main));
     }
 
+    // 2.5.0 wrote applied_at in the time zone of the site of the annotation. The upgrade to version 4 runs once for the
+    // network, from any site: each row moves with the time zone of its own site, a row not yet assigned to a site too.
+    public function test_upgrade_converts_applied_at_with_the_time_zone_of_each_site() {
+        global $wpdb;
+        update_option('timezone_string', 'Europe/Paris');
+        switch_to_blog($this->blog_id);
+        update_option('timezone_string', 'America/New_York');
+        restore_current_blog();
+        $legacy     = ['dates_utc' => 0, 'created_at' => '2026-09-01 12:00:00', 'status' => 'applied'];
+        $main       = $this->insert_annotation($legacy + ['applied_at' => '2026-09-01 14:00:00']);
+        $sub        = $this->insert_annotation($legacy + ['applied_at' => '2026-09-01 08:00:00', 'blog_id' => $this->blog_id, 'url' => get_home_url($this->blog_id, '/')]);
+        $unassigned = $this->insert_annotation($legacy + ['applied_at' => '2026-09-01 08:00:00', 'blog_id' => 0, 'url' => get_home_url($this->blog_id, '/page/')]);
+
+        $zone = $wpdb->get_var('SELECT @@session.time_zone');
+        $wpdb->query("SET time_zone = '+00:00'");
+        update_site_option('coquille_revue_db_version', '3');
+        coquille_revue_maybe_upgrade();
+        $wpdb->query($wpdb->prepare('SET time_zone = %s', $zone));
+
+        $this->assertSame('2026-09-01 12:00:00', $this->get_annotation($main)['applied_at'], 'Paris, summer time');
+        $this->assertSame('2026-09-01 12:00:00', $this->get_annotation($sub)['applied_at'], 'New York, summer time');
+        $row = $this->get_annotation($unassigned);
+        $this->assertSame([(string) $this->blog_id, '2026-09-01 12:00:00', '2026-09-01 12:00:00'], [$row['blog_id'], $row['applied_at'], $row['created_at']]);
+    }
+
     public function test_daily_purge_removes_rows_of_sites_that_no_longer_exist() {
         $orphan = $this->insert_annotation(['blog_id' => 999999]);
         $kept   = $this->insert_annotation();
