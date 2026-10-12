@@ -24,6 +24,10 @@ class Test_Coquille_Revue_Alerts extends Coquille_Revue_Test_Case {
         ] as $suggestion) {
             $this->assertSame([], $this->compared($original, $suggestion), $suggestion);
         }
+        // A title in capitals put back in lower case adds no word, accented letters included.
+        $this->assertSame([], $this->compared('ÉTÉ ÉCOLE ÉLÈVE ÉTUDE ÉQUIPE ÉVÉNEMENT', 'été école élève étude équipe événement'));
+        $this->assertSame([], $this->compared('ŒUVRES À DÉCOUVRIR : ÇA, CE ÎLOT, ÉTÉ', 'Œuvres à découvrir : ça, ce îlot, été'));
+        $this->assertSame('été œuvre ÿ ×', coquille_revue_lower('ÉTÉ ŒUVRE Ÿ ×'));
         $this->assertSame([], $this->compared('Nous sommes ouverts du lundi au vendredi', 'Notre boutique vous accueille du lundi au samedi'));
         // An area describes a request, a question asks one: neither replaces the text.
         $long = 'Mettre dans le même menu déroulant les réglages et le test d’envoi, en enregistrement automatique.';
@@ -300,13 +304,27 @@ class Test_Coquille_Revue_Alerts extends Coquille_Revue_Test_Case {
             'Profil : lnkd.in/abc',
             'Court : is.gd/x1',
             'Rendez-vous sur evil.de',
+            'Allez sur evil.de !',
+            "Rendez-vous sur evil.de.\nÀ bientôt",
+            'Voir evil.de/promo pour en profiter',
+            'Voir evil.de?x=1 pour en profiter',
             'Écrivez à contact@exemple.de',
+            'Écrivez à contact@exemple.de pour un devis',
             'Mon site : jean-dupont.me',
         ] as $text) {
             $this->assertContains('web_address', $this->alerts($text), $text);
         }
-        // A missing space before a capitalised word is a typo to correct, not an address.
-        foreach (['Fin de phrase.De plus, une espace manque.', 'Il est arrivé.Me voici enfin.', 'Voir la page.De même pour les autres.', 'Thanks.Me too.'] as $text) {
+        // A missing space before a word is a typo to correct, not an address: before a capitalised word, and before
+        // a word in lower case in the middle of the text (a .de or .me domain alone in the middle of a sentence is missed).
+        foreach ([
+            'Fin de phrase.De plus, une espace manque.',
+            'Il est arrivé.Me voici enfin.',
+            'Voir la page.De même pour les autres.',
+            'Thanks.Me too.',
+            'des fruits, etc.de toute façon',
+            'il est parti.de nouveau',
+            "c'est fini.me voilà",
+        ] as $text) {
             $this->assertSame([], $this->alerts($text), $text);
         }
     }

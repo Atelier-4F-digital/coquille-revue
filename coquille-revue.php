@@ -81,13 +81,18 @@ const COQUILLE_REVUE_EXPORT_BATCH   = 500;   // exports read the database in bat
 // Web address, even without "http": mailto:, tel:, data:, //host, www., known link shorteners (t.me, bit.ly…)
 // and bare domains with common extensions, with their path. Extensions that are also common words
 // (la, il, in, it, to…) are left out: "phrase.La suite", a forgotten space, is precisely what a reviewer
-// corrects. .de and .me only count in lower case after a name of at least 3 characters ("evil.de"), never
-// for "phrase.De plus". Bounded repetitions (63 characters per label, 10 labels at most): unbounded,
+// corrects. .de and .me only count in lower case after a name of at least 3 characters, and only before a path
+// (/ ? #), at the end of a line or of the field (punctuation and spaces aside), or after an @: "evil.de/x",
+// "Allez sur evil.de !" and "contact@exemple.de" are links, but neither "phrase.De plus" nor "etc.de toute façon"
+// nor "fini.me voilà" (a forgotten space before a word in lower case), at the cost of missing "evil.de" alone in the
+// middle of a sentence. Bounded repetitions (63 characters per label, 10 labels at most): unbounded,
 // a text such as "a.a.a.a…" costs quadratic time at every display.
 const COQUILLE_REVUE_LINK_PATTERN = '~(?:https?:|mailto:|tel:\+?\d|data:[a-z]+/|//[a-z0-9-]+\.|www\.)\S*'
     . '|(?:\b(?:t\.me|wa\.me|bit\.ly|tinyurl\.com|goo\.gl|ow\.ly|is\.gd|buff\.ly|rebrand\.ly|cutt\.ly|shorturl\.at|lnkd\.in)'
     . '|\b(?:[a-z0-9-]{1,63}\.){0,8}(?:[a-z0-9-]{1,63}\.(?:com|net|org|info|biz|io|co|app|dev|xyz|icu|online|site|store|shop|top|club|vip|buzz|cfd|sbs|bond|cyou|monster|lol'
-    . '|fr|eu|ru|su|cn|uk|ly|gg|cc|tv|tk|ml|ga|cf|gq|pw|ws|fm|nl|pl|br|jp|kr|ua|kz|ir|cz|ch|mc|tn|dz|sn|cm|gl|vn|tr|example)|[a-z0-9-]{3,63}\.(?-i:de|me)))\b(?:[/?#]\S*)?~iu';
+    . '|fr|eu|ru|su|cn|uk|ly|gg|cc|tv|tk|ml|ga|cf|gq|pw|ws|fm|nl|pl|br|jp|kr|ua|kz|ir|cz|ch|mc|tn|dz|sn|cm|gl|vn|tr|example)'
+    . '|[a-z0-9-]{3,63}\.(?-i:de|me)(?=[/?#]|[\h.,;:!?)\]»"\']*(?:\n|\z)))'
+    . '|(?<=@)(?:[a-z0-9-]{1,63}\.){0,8}[a-z0-9-]{1,63}\.(?-i:de|me))\b(?:[/?#]\S*)?~iu';
 
 // Personal data
 const COQUILLE_REVUE_IP_RETENTION_DAYS    = 30;   // IP addresses
@@ -1372,9 +1377,9 @@ function coquille_revue_added_symbols($from, $to, $symbols) {
 }
 
 // Alerts that compare the suggestion with the original text: [code => detail], for example
-// ['added_symbols' => ' (U+0022)']. Words are compared regardless of the case of ASCII letters.
+// ['added_symbols' => ' (U+0022)']. Words are compared regardless of case, accented letters included.
 function coquille_revue_comparison_alerts($original, $suggestion) {
-    $words = fn($text) => preg_match_all('~[\p{L}\p{N}]+~u', strtolower((string) $text), $m) ? $m[0] : [];
+    $words = fn($text) => preg_match_all('~[\p{L}\p{N}]+~u', coquille_revue_lower($text), $m) ? $m[0] : [];
     $left  = array_count_values($words($original));
     $new   = 0;
     foreach ($words($suggestion) as $word) {
@@ -1552,6 +1557,24 @@ function coquille_revue_codepoint($char) {
         $code = ($code << 6) | ($bytes[$i] & 0x3F);
     }
     return $code;
+}
+
+// Text in lower case, accented letters included. Without mbstring, the accented capitals of Latin-1 (À to Þ), Œ and Ÿ
+// are converted by a table: strtolower() only converts ASCII letters.
+function coquille_revue_lower($text) {
+    if (function_exists('mb_strtolower')) {
+        return mb_strtolower((string) $text, 'UTF-8');
+    }
+    static $map = null;
+    if ($map === null) {
+        $map = ["\u{0152}" => "\u{0153}", "\u{0178}" => "\u{00FF}"];
+        foreach (range(0xC0, 0xDE) as $code) {
+            if ($code !== 0xD7) { // multiplication sign
+                $map["\xC3" . chr($code - 0x40)] = "\xC3" . chr($code - 0x20);
+            }
+        }
+    }
+    return strtr(strtolower((string) $text), $map);
 }
 
 function coquille_revue_claude_code_instructions() {

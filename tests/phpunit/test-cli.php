@@ -227,6 +227,18 @@ class Test_Coquille_Revue_Cli extends Coquille_Revue_Test_Case {
         $this->assertSame('Rejoignez notre groupe', get_post($post)->post_content);
     }
 
+    // A forgotten space before a word in lower case is not a .de or .me address: corrected without --alerts-reviewed.
+    public function test_a_missing_space_before_de_or_me_can_be_corrected() {
+        $post = self::factory()->post->create(['post_content' => 'Des fruits, etc.de toute façon. Il est fini.me voilà']);
+        foreach (['etc.de toute façon' => 'etc. De toute façon', 'fini.me voilà' => 'fini. Me voilà'] as $original => $suggestion) {
+            $id = $this->insert_annotation(['original_text' => $original, 'suggestion' => $suggestion]);
+            $this->assertSame([], coquille_revue_annotation_alerts($this->get_annotation($id)), $original);
+            $report = $this->apply($id, ['type' => 'post', 'ref' => (string) $post]);
+            $this->assertIsArray($report, is_string($report) ? $report : '');
+        }
+        $this->assertSame('Des fruits, etc. De toute façon. Il est fini. Me voilà', get_post($post)->post_content);
+    }
+
     public function test_a_typo_around_a_percent_sign_can_be_corrected() {
         $post   = self::factory()->post->create(['post_content' => 'Profitez de 20%de remise ce mois-ci']);
         $id     = $this->insert_annotation(['original_text' => 'Profitez de 20%de remise', 'suggestion' => 'Profitez de 20 % de remise']);
