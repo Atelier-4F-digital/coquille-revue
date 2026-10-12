@@ -1424,6 +1424,19 @@ function coquille_revue_decode_text($text) {
     return $text;
 }
 
+// Copy of a technical field (CSS selector, XPath, path of the address) for the checks: CSS escapes (\000020, \;)
+// decoded on top of the forms of coquille_revue_normalize_text(), three passes for a double encoding.
+function coquille_revue_decode_technical($field) {
+    $field = (string) $field;
+    for ($i = 0; $i < 3; $i++) {
+        $before = $field;
+        $field  = preg_replace('~\\\\([0-9a-f]{1,6})[ \t\r\n\f]?~i', '&#x$1;', $field) ?? $field;
+        $field  = preg_replace('~\\\\([^0-9a-f\r\n\f])~iu', '$1', coquille_revue_normalize_text($field)) ?? $field;
+        if ($field === $before) break;
+    }
+    return $field;
+}
+
 // Signals detected without AI in the fields typed by the visitor. A signal is not a proof:
 // it only calls for a careful review before any correction.
 // Each alert is a fixed English code (read by Claude Code), followed by the code points involved;
@@ -1436,21 +1449,23 @@ function coquille_revue_annotation_alerts($row, $labels = []) {
     $text      = implode("\n", [$author, $row['page_title'] ?? '', $row['original_text'] ?? '', $row['suggestion'] ?? '']);
     $decoded   = coquille_revue_normalize_text($text);
     // Position in the page and path of the address: typed by the visitor too, but made of tag names,
-    // classes and segments. Only invisible characters, mixed alphabets and wording addressed to an AI or
-    // false approvals are searched there (an isolated name such as admin, password or redirect is ordinary there), the
-    // separators (- _ . / > # …) being read as spaces, field by field.
+    // classes and segments. Only invisible characters, mixed alphabets, encoded characters and wording addressed
+    // to an AI or false approvals are searched there (an isolated name such as admin, password, redirect or chatgpt
+    // is ordinary there), the separators (- _ . / > # …) being read as spaces, field by field, as sent and decoded.
     $path      = rawurldecode((string) wp_parse_url((string) ($row['url'] ?? ''), PHP_URL_PATH));
     $fields    = [(string) ($row['css_selector'] ?? ''), (string) ($row['xpath'] ?? ''), $path];
     $technical = implode("\n", $fields);
-    $words     = array_map(fn($field) => preg_replace('~[-_./#>:=()\[\]\s]+~', ' ', $field) ?? $field, $fields);
+    $words     = array_map(
+        fn($field) => preg_replace('~[-_./#>:=()\[\]\s]+~', ' ', $field) ?? $field,
+        array_unique(array_merge($fields, array_map('coquille_revue_decode_technical', $fields)))
+    );
 
     // Instruction or authority wording in French AND in English, searched together whatever the site language
     // (never translated). "AI" in upper case only: in lower case, it would match the French "j'ai". Each space
     // of the lists accepts any whitespace.
-    // Wording addressed to an AI, instructions for a later review pass and false approvals: searched in every field.
-    $instruction_ai = '(hey|hi|hello|dear|note|message|attention|for|to|pour|à) ((the|l)\s*[\'’]?\s*)?(claude|chatgpt)'
-        . '|(hey|hi|hello|dear|note|message|attention) ((the|l)\s*[\'’]?\s*)?(ai|ia|gpt|llm)|(for|to|pour|à) (the|l)\s*[\'’]?\s*(ai|ia|gpt|llm)'
-        . '|chatgpt|llm|language model|system (prompt|message|instructions?)|developer mode|jailbreak\w*'
+    // Wording addressed to an AI ("note for Claude", "hey AI", "pour l'IA") and false approvals: searched in every field.
+    $instruction_ai = '(hey|hi|hello|dear|note|message|attention)( (for|to|pour|à))? ((the|l)\s*[\'’]?\s*)?(claude|chatgpt|ai|ia|gpt|llm)'
+        . '|(for|to|pour|à) (the|l)\s*[\'’]?\s*(ai|ia|gpt|llm)|system prompt|developer mode|jailbreak\w*'
         . '|ignor(e|ez|er) (all|any|every|the|previous|prior|above|earlier|les|la|le|tout|toutes|tous|ces|cette|précédent\w*)'
         . '|disregard\w*|forget (all|everything|previous|the above|your)|oublie[rz]? (tout|les|toutes|ces|cette)'
         . '|without (asking|confirm\w*|validat\w*|approv\w*|review\w*|checking)|no need to (ask|confirm|validate|check|review)'
@@ -1458,10 +1473,12 @@ function coquille_revue_annotation_alerts($row, $labels = []) {
         . '|(do not|don[\'’]?t|never) (ask|confirm|tell|mention|report|flag|show)'
         . '|already (approved|validated|confirmed|authori[sz]ed)|pre(-| )?(approved|validated|authori[sz]ed)|(approved|validated|authori[sz]ed) by'
         . '|(user|owner|admin\w*|editor|team) (has |have )?(approved|validated|confirmed|agreed|authori[sz]ed)'
-        . '|(déjà|a|ont|avons) (déjà )?(validé|approuvé)e?s?|(validée?|approuvée?) par|go ahead|feu vert'
-        . '|silently|quietly|(next|future) (pass|run|review)|skip (the )?(confirmation|review|check)|discrètement|en silence|prochain passage';
-    // Isolated words too for the texts, the author and the page title.
-    $instruction_words = 'ignor(e|ed|es|ing|er|ez)|instructions?|consignes?|claude|gpt|ia|(?-i:AI)|assistant|annotations?|automat\w*'
+        . '|(déjà|a|ont|avons) (déjà )?(validé|approuvé)e?s?|(validée?|approuvée?) par|go ahead|feu vert';
+    // For the texts, the author and the page title only: isolated words and instructions for a silent or later pass
+    // (in a class name or an address, "llm-card" or "/la-marche-en-silence/" are ordinary).
+    $instruction_words = 'ignor(e|ed|es|ing|er|ez)|instructions?|consignes?|claude|chatgpt|gpt|llm|language model|system message|ia|(?-i:AI)'
+        . '|assistant|annotations?|automat\w*|silently|quietly|(next|future) (pass|run|review)|skip (the )?(confirmation|review|check)'
+        . '|discr[eè]tement|silencieusement|en silence|prochain passage'
         . '|redirect\w*|redirig\w*|administrateur|admin(istrator)?s?|override|mots? de passe|passwords?|api keys?|access tokens?|private keys?|secrets?';
     $instruction    = fn($list) => '~(*UCP)\b(' . str_replace(' ', '\s+', $list) . ')\b~iu';
     $lookalike      = COQUILLE_REVUE_LOOKALIKE_SCRIPTS;
@@ -1469,10 +1486,12 @@ function coquille_revue_annotation_alerts($row, $labels = []) {
     // Code, including in an encoded form (<, &#60;, &#60 without semicolon, &lt;, %3C) or as an attribute (on…=, style=).
     $code_pattern = '~(<|>|`|\$\(|&&|\|\||\{\{|\[/?[a-z][a-z0-9_-]*[\s\]]|\.php\b|\b(curl|wget|eval|base64|wp-config|iframe|script|javascript|widget|shortcode)\b'
         . '|\\\\u[0-9a-f]{4}|&#x?[0-9a-f]+;?|&[a-z][a-z0-9]*;|%(2[0-9a-f]|3[a-f]|5[b-e]|60|7[b-d])|\bon[a-z]+\s*=|\bstyle\s*=)~iu';
-    // For each alert: one or more pairs [pattern, texts checked].
+    // For each alert: one or more pairs [pattern, texts checked]. A backslash (CSS escape such as \20), a character
+    // reference or an entity in a technical field is never written by the script of the page: the browser gives ids
+    // and classes already decoded.
     $checks = [
         'web_address'              => [[COQUILLE_REVUE_LINK_PATTERN, [$text, $decoded]]],
-        'code_or_command'          => [[$code_pattern, [$text, $decoded]]],
+        'code_or_command'          => [[$code_pattern, [$text, $decoded]], ['~\\\\|&#|&[a-z][a-z0-9]*;~i', [$technical]]],
         'invisible_characters'     => [[COQUILLE_REVUE_INVISIBLE_PATTERN, [coquille_revue_without_flags($text), coquille_revue_without_flags($technical)]]],
         'mixed_scripts'            => [['~\p{Latin}[' . $lookalike . ']|[' . $lookalike . ']\p{Latin}'
             . '|^(?![\s\S]*[\p{Han}\p{Hiragana}\p{Katakana}\p{Hangul}])[\s\S]*?' . $fullwidth . '~u', [$text, $technical]]],
