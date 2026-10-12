@@ -133,7 +133,7 @@ class Test_Coquille_Revue_Rest_Api extends Coquille_Revue_Test_Case {
     // ("ignore", "allrule"…) is hidden text.
     public function test_a_fake_flag_is_hidden_text() {
         $this->set_public_mode();
-        $flag = fn($code) => "\u{1F3F4}" . implode('', array_map(fn($c) => html_entity_decode('&#x' . dechex(0xE0000 + ord($c)) . ';', ENT_QUOTES, 'UTF-8'), str_split($code))) . "\u{E007F}";
+        $flag = fn($code) => self::FLAGS[$code];
         foreach (['ignore', 'allrule', 'sdelete', 'footer', 'gbeng1', 'fridf'] as $code) {
             $response = $this->post_annotation(['suggestion' => 'Bonjour le monde ' . $flag($code)]);
             $this->assertSame(400, $response->get_status(), $code);

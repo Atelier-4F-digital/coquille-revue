@@ -2,6 +2,20 @@
 // Shared helpers: REST calls as the script of the page sends them, rows written straight into the table, sent emails.
 abstract class Coquille_Revue_Test_Case extends WP_UnitTestCase {
 
+    // Emoji flags written out: black flag U+1F3F4, one Tag character per letter of the code (U+E0061 is "a",
+    // U+E0031 is "1"…), then U+E007F. Only gbeng, gbsct and gbwls are flags that systems show; the others hide words.
+    const FLAGS = [
+        'gbeng'   => "\u{1F3F4}\u{E0067}\u{E0062}\u{E0065}\u{E006E}\u{E0067}\u{E007F}",
+        'gbsct'   => "\u{1F3F4}\u{E0067}\u{E0062}\u{E0073}\u{E0063}\u{E0074}\u{E007F}",
+        'gbwls'   => "\u{1F3F4}\u{E0067}\u{E0062}\u{E0077}\u{E006C}\u{E0073}\u{E007F}",
+        'gbeng1'  => "\u{1F3F4}\u{E0067}\u{E0062}\u{E0065}\u{E006E}\u{E0067}\u{E0031}\u{E007F}",
+        'fridf'   => "\u{1F3F4}\u{E0066}\u{E0072}\u{E0069}\u{E0064}\u{E0066}\u{E007F}",
+        'ignore'  => "\u{1F3F4}\u{E0069}\u{E0067}\u{E006E}\u{E006F}\u{E0072}\u{E0065}\u{E007F}",
+        'allrule' => "\u{1F3F4}\u{E0061}\u{E006C}\u{E006C}\u{E0072}\u{E0075}\u{E006C}\u{E0065}\u{E007F}",
+        'sdelete' => "\u{1F3F4}\u{E0073}\u{E0064}\u{E0065}\u{E006C}\u{E0065}\u{E0074}\u{E0065}\u{E007F}",
+        'footer'  => "\u{1F3F4}\u{E0066}\u{E006F}\u{E006F}\u{E0074}\u{E0065}\u{E0072}\u{E007F}",
+    ];
+
     public function set_up() {
         parent::set_up();
         $GLOBALS['wp_rest_server'] = null;

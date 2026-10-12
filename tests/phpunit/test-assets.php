@@ -84,7 +84,7 @@ class Test_Coquille_Revue_Assets extends Coquille_Revue_Test_Case {
         foreach (['<', '>', '&', "'"] as $char) {
             $this->assertStringNotContainsString($char, $m[1], 'escaped in the data: ' . $char);
         }
-        $this->assertStringContainsString(chr(92) . 'u0022', $m[1], 'quotes inside the texts are escaped');
+        $this->assertStringContainsString('\u0022', $m[1], 'quotes inside the texts are escaped');
         $this->assertSame($evil, json_decode($m[1], true)['i18n']['send'], 'the text itself is intact');
         $this->assertStringNotContainsString('<script>alert(1)', $html);
     }

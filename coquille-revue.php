@@ -1396,7 +1396,7 @@ function coquille_revue_comparison_alerts($original, $suggestion) {
     }
     $symbols = coquille_revue_added_symbols($original, $suggestion, COQUILLE_REVUE_STRICT_SYMBOLS . COQUILLE_REVUE_REVIEWED_SYMBOLS);
     if ($symbols) {
-        $alerts['added_symbols'] = ' (' . implode(', ', array_map(fn($c) => sprintf('U+%04X', ord($c)), $symbols)) . ')';
+        $alerts['added_symbols'] = ' (' . implode(', ', array_map(fn($c) => sprintf('U+%04X', coquille_revue_codepoint($c)), $symbols)) . ')';
     }
     return $alerts;
 }
@@ -1412,6 +1412,8 @@ function coquille_revue_normalize_text($text) {
     if (class_exists('Normalizer')) {
         $text = Normalizer::normalize($text, Normalizer::FORM_KC) ?: $text;
     }
+    // Full-width forms U+FF01 to U+FF5E are the ASCII characters ! to ~ moved by 0xFEE0 (Unicode block "Halfwidth and
+    // Fullwidth Forms"): converted here too when the intl extension, and so Normalizer, is missing.
     $text = preg_replace_callback('~[\x{FF01}-\x{FF5E}]~u', fn($m) => chr(coquille_revue_codepoint($m[0]) - 0xFEE0), $text) ?? $text;
     return preg_replace(COQUILLE_REVUE_INVISIBLE_PATTERN, '', $text) ?? $text;
 }
@@ -1424,7 +1426,7 @@ function coquille_revue_decode_text($text) {
         $text   = preg_replace('~\\\\u([0-9a-f]{4})~i', '&#x$1;', $text) ?? $text;
         $text   = preg_replace_callback('~&#(x[0-9a-f]+|[0-9]+);?~i', fn($m) => html_entity_decode('&#' . $m[1] . ';', ENT_QUOTES | ENT_HTML5, 'UTF-8'), $text) ?? $text;
         $text   = html_entity_decode($text, ENT_QUOTES | ENT_HTML5, 'UTF-8');
-        $text   = preg_replace_callback('~%([0-7][0-9a-f])~i', fn($m) => chr((int) hexdec($m[1])), $text) ?? $text;
+        $text   = preg_replace_callback('~%[0-7][0-9a-f]~i', fn($m) => rawurldecode($m[0]), $text) ?? $text;
         if ($text === $before) break;
     }
     return $text;
@@ -1573,22 +1575,21 @@ function coquille_revue_codepoint($char) {
     return $code;
 }
 
-// Text in lower case, accented letters included. Without mbstring, the accented capitals of Latin-1 (À to Þ), Œ and Ÿ
-// are converted by a table: strtolower() only converts ASCII letters.
+// Accented capitals of Latin-1 (À to Þ, without the multiplication sign ×), Œ and Ÿ, with their lower case: the table
+// that coquille_revue_lower() uses without mbstring, strtolower() only converting the ASCII letters.
+const COQUILLE_REVUE_LOWER_ACCENTS = [
+    'À' => 'à', 'Á' => 'á', 'Â' => 'â', 'Ã' => 'ã', 'Ä' => 'ä', 'Å' => 'å', 'Æ' => 'æ', 'Ç' => 'ç',
+    'È' => 'è', 'É' => 'é', 'Ê' => 'ê', 'Ë' => 'ë', 'Ì' => 'ì', 'Í' => 'í', 'Î' => 'î', 'Ï' => 'ï',
+    'Ð' => 'ð', 'Ñ' => 'ñ', 'Ò' => 'ò', 'Ó' => 'ó', 'Ô' => 'ô', 'Õ' => 'õ', 'Ö' => 'ö', 'Ø' => 'ø',
+    'Ù' => 'ù', 'Ú' => 'ú', 'Û' => 'û', 'Ü' => 'ü', 'Ý' => 'ý', 'Þ' => 'þ', 'Œ' => 'œ', 'Ÿ' => 'ÿ',
+];
+
+// Text in lower case, accented letters included.
 function coquille_revue_lower($text) {
     if (function_exists('mb_strtolower')) {
         return mb_strtolower((string) $text, 'UTF-8');
     }
-    static $map = null;
-    if ($map === null) {
-        $map = ["\u{0152}" => "\u{0153}", "\u{0178}" => "\u{00FF}"];
-        foreach (range(0xC0, 0xDE) as $code) {
-            if ($code !== 0xD7) { // multiplication sign
-                $map["\xC3" . chr($code - 0x40)] = "\xC3" . chr($code - 0x20);
-            }
-        }
-    }
-    return strtr(strtolower((string) $text), $map);
+    return strtr(strtolower((string) $text), COQUILLE_REVUE_LOWER_ACCENTS);
 }
 
 function coquille_revue_claude_code_instructions() {

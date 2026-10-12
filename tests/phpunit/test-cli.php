@@ -173,7 +173,7 @@ class Test_Coquille_Revue_Cli extends Coquille_Revue_Test_Case {
     // Only England, Scotland and Wales are flags: a black flag followed by any other code hides text, refused even after
     // review, in the suggestion as in an approved text.
     public function test_a_fake_flag_is_refused_even_after_review() {
-        $flag = fn($code) => "\u{1F3F4}" . implode('', array_map(fn($c) => html_entity_decode('&#x' . dechex(0xE0000 + ord($c)) . ';', ENT_QUOTES, 'UTF-8'), str_split($code))) . "\u{E007F}";
+        $flag = fn($code) => self::FLAGS[$code];
         $post = self::factory()->post->create(['post_content' => 'Bonjour le monde']);
         $on   = ['type' => 'post', 'ref' => (string) $post, 'alerts-reviewed' => true];
         $fake = 'Bonjour le monde ' . $flag('ignore') . $flag('allrule') . $flag('sdelete') . $flag('footer');
