@@ -1480,13 +1480,19 @@ function coquille_revue_annotation_alerts($row, $labels = []) {
     // ordinary (/pour-claude-monet/, /custom-instructions-for-chatgpt/, /new-rules-for-ai/): only a name of an AI
     // followed by an order that is not also a noun counts ("to Claude: apply…", not /guide-to-ai-update-2026/).
     // "ignore", "forget" and "oublier" only count there before all, previous, instructions, rules…, and "do not ask,
-    // show, tell…" before the user or the owner (/ignore-the-noise/, #dont-show-again, #dont-ask-again): the texts
-    // read "ignore" alone and "do not show" in their own list.
+    // show, tell…" before the user or the owner, "do not ask, confirm, tell…" also before anyone, the approval itself
+    // (for confirmation, permission…), "before publishing…" or the changes (/ignore-the-noise/, #dont-show-again,
+    // #dont-ask-again, /dont-ask-me-again/, /never-ask-a-barber/, /dont-tell-mom/): the texts read "ignore" alone and
+    // "do not show" in their own list.
     $ai             = '((the|l)\s*[\'’]?\s*)?(claude|chatgpt|ai|ia|gpt|llm)';
     $the_ai         = '(the|l)\s*[\'’]?\s*(ai|ia|gpt|llm)';
     $orders         = 'apply|publish|accept|approve|validate'
         . '|appliqu(e|er|ez)|publi(e|er|ez)|remplac(e|er|ez)|supprim(e|er|ez)|modifi(e|er|ez)|valid(e|er|ez)|accept(e|er|ez)';
     $rules          = 'instructions?|consignes?|rules?|r[eè]gles?';
+    $whom           = '((it|this|that|anything) )?((to|with) )?(the )?((site|page|website) )?(user|owner|admin\w*|editor|webmaster)';
+    $approval       = 'anyone|anybody|(for )?(confirmations?|approvals?|permissions?|consent|authori[sz]ations?)(?! again)'
+        . '|before (publish|apply|chang|updat|edit|replac|delet|remov|sav|modify|correct|fix|committ?|proceed|act|do|mak|go)ing'
+        . '|((this|these|the|any) )?changes?';
     $instruction_ai = '(hey|hi|hello|dear)( (for|to|pour|à))? ' . $ai
         . '|(note|message|attention|memo) ((for|to|pour|à) ' . $ai . '|(claude|chatgpt|gpt|llm)|' . $the_ai . ')'
         . '|(for|to|pour|à) (claude|chatgpt|gpt|llm) (' . $orders . ')'
@@ -1496,7 +1502,7 @@ function coquille_revue_annotation_alerts($row, $labels = []) {
         . '|oublie[rz]? (tout|toutes|tous|(les|ces|cette|vos) (' . $rules . '))'
         . '|without (asking|confirm\w*|validat\w*|approv\w*|review\w*|checking)|no need to (ask|confirm|validate|check|review)'
         . '|sans (demander|confirm\w*|valid\w*|reconfirm\w*)|(pas besoin|inutile) de (demander|confirmer|valider)'
-        . '|(do not|don[\s\'’]?t|never) (ask|confirm|tell|mention|report|flag|show) ((it|this|that|anything) )?(to )?(the )?(user|owner|admin\w*|editor|webmaster)'
+        . '|(do not|don[\s\'’]?t|never) ((ask|confirm|tell|mention|report|flag|show) ' . $whom . '|(ask|confirm|tell|mention|report|flag) (' . $approval . '))'
         . '|already (approved|validated|confirmed|authori[sz]ed)|pre(-| )?(approved|validated|authori[sz]ed)|(approved|validated|authori[sz]ed) by'
         . '|(user|owner|admin\w*|editor|team) (has |have )?(approved|validated|confirmed|agreed|authori[sz]ed)'
         . '|(déjà|a|ont|avons) (déjà )?(validé|approuvé)e?s?|(validée?|approuvée?) par|go ahead|feu vert';

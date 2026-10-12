@@ -346,9 +346,10 @@ class Test_Coquille_Revue_Alerts extends Coquille_Revue_Test_Case {
     }
 
     // In a technical field, "ignore", "forget" and "oublier" only count before all, previous, instructions, rules,
-    // tout… (a determiner may come between), and "do not ask, show, tell…" before the user or the owner: ordinary
-    // class names and addresses otherwise. "sans attendre" is only searched in the texts. The texts keep "ignore"
-    // alone and "do not show" or "don't ask".
+    // tout… (a determiner may come between), and "do not ask, show, tell…" before the user or the owner; "do not ask,
+    // confirm, tell…" also before anyone, the approval (for confirmation, permission…), "before publishing…" or the
+    // changes: ordinary class names and addresses otherwise. "sans attendre" is only searched in the texts. The texts
+    // keep "ignore" alone and "do not show" or "don't ask".
     public function test_generic_wording_in_technical_fields() {
         foreach ([
             ['css_selector' => '#dont-show-again'],
@@ -360,6 +361,13 @@ class Test_Coquille_Revue_Alerts extends Coquille_Revue_Test_Case {
             ['css_selector' => '#cookie-notice-dont-ask'],
             ['url' => home_url('/dont-ask-me-again/')],
             ['url' => home_url('/never-ask-a-barber/')],
+            ['url' => home_url('/dont-tell-mom/')],
+            ['url' => home_url('/never-tell-me-the-odds/')],
+            ['url' => home_url('/dont-tell-the-bride/')],
+            ['url' => home_url('/never-ask-this-question-at-an-interview/')],
+            ['css_selector' => '#dont-show-this-again'],
+            ['css_selector' => '#dont-ask-for-permission-again'],
+            ['css_selector' => '.never-ask-for-a-discount'],
             ['url' => home_url('/ignore-the-noise/')],
             ['url' => home_url('/comment-ignorer-les-critiques/')],
             ['url' => home_url('/comment-oublier-les-mauvaises-habitudes/')],
@@ -391,6 +399,20 @@ class Test_Coquille_Revue_Alerts extends Coquille_Revue_Test_Case {
             ['css_selector' => '#do-not-show-the-user'],
             ['css_selector' => '#do-not-ask-the-user'],
             ['css_selector' => '.never-tell-the-user'],
+            ['css_selector' => '#dont-ask-for-confirmation'],
+            ['url' => home_url('/do-not-ask-for-approval/')],
+            ['url' => home_url('/never-ask-for-permission/')],
+            ['css_selector' => '#dont-ask-before-publishing'],
+            ['css_selector' => '#never-confirm-with-the-user'],
+            ['url' => home_url('/do-not-confirm-with-the-owner/')],
+            ['css_selector' => '#dont-ask-anyone'],
+            ['url' => home_url('/dont-tell-anyone/')],
+            ['css_selector' => '#never-ask-the-site-owner'],
+            ['css_selector' => '#do-not-ask-permission'],
+            ['css_selector' => '#dont-confirm-changes'],
+            ['url' => home_url('/never-ask-confirmation/')],
+            ['css_selector' => '#dont-mention-this-change'],
+            ['css_selector' => '.dontAskForApproval'],
         ] as $fields) {
             $this->assertSame(['instruction_or_authority'], $this->alerts('Bienvenue', $fields), wp_json_encode($fields));
         }
