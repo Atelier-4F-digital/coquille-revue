@@ -10,6 +10,7 @@
 /tests
 /claude-plugin
 /wporg-assets
+/docs
 /vendor
 /node_modules
 /phpcs.xml.dist

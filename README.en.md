@@ -6,6 +6,11 @@ An open-source WordPress plugin to proofread a website right on its pages: revie
 
 ▶ [Try it in WordPress Playground](https://playground.wordpress.net/?blueprint-url=https://raw.githubusercontent.com/Atelier-4F-digital/coquille-revue/main/wporg-assets/blueprints/blueprint.json): a disposable WordPress in your browser, with the latest release of the plugin, public mode on and a sample page to review. Nothing is installed on your computer.
 
+<p>
+  <a href="wporg-assets/screenshot-1.png"><img src="wporg-assets/screenshot-1.png" width="49%" alt="Review mode on a public page: a highlighted sentence and the remark bubble with the correction typed in"></a>
+  <a href="wporg-assets/screenshot-3.png"><img src="wporg-assets/screenshot-3.png" width="49%" alt="The Coquille Revue admin page: pending annotations with their alerts, status buttons and exports"></a>
+</p>
+
 ---
 
 ## What it does
@@ -15,6 +20,16 @@ An open-source WordPress plugin to proofread a website right on its pages: revie
 - **A thank-you email** goes to the contributor when their suggestion is applied, if they left an address (or were logged in).
 - **With Claude Code**, the `/coquille-revue:apply-review` command looks for each text (posts and pages, menus, options, custom fields, terms, theme and plugin files, translations), shows the before/after, and only applies a change once you approve it, annotation by annotation.
 - **Translation-ready**: interface in English and French (the site language, and in the admin each user's language), with the `languages/coquille-revue.pot` template. Emails are sent in the site language.
+
+## Screenshots
+
+<p>
+  <a href="wporg-assets/screenshot-2.png"><img src="wporg-assets/screenshot-2.png" width="42%" alt="The information popover of the pencil button, which invites visitors to start reviewing"></a>
+  <a href="wporg-assets/screenshot-4.png"><img src="wporg-assets/screenshot-4.png" width="42%" alt="The Markdown export for Claude Code: the safety rules, then each annotation as data in its own block"></a>
+  <a href="wporg-assets/screenshot-5.png"><img src="wporg-assets/screenshot-5.png" width="12%" alt="On a phone: the remark bubble at the bottom of the screen, below the highlighted sentence"></a>
+</p>
+
+The information popover of the pencil button, the Markdown export for Claude Code, and the remark bubble on a phone.
 
 ## Installation
 

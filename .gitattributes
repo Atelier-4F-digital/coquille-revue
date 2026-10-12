@@ -14,6 +14,7 @@
 /tests             export-ignore
 /claude-plugin     export-ignore
 /wporg-assets      export-ignore
+/docs              export-ignore
 /phpcs.xml.dist    export-ignore
 /composer.json     export-ignore
 /composer.lock     export-ignore

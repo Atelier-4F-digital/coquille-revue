@@ -105,12 +105,11 @@ Deactivating keeps everything. Deleting the plugin from the Plugins screen remov
 
 == Screenshots ==
 
-1. Review mode on a public page: selected text and the remark bubble.
-2. An area framed on the page, with its remark.
-3. The information popover of the pencil button.
-4. The admin page: annotations by status, alerts, status buttons and exports.
-5. On a phone: the remark bubble stays above the virtual keyboard.
-6. The thank-you email received by a contributor.
+1. Review mode on a public page: the reviewer highlights a sentence, types the correction in the remark bubble and sends it.
+2. The information popover of the pencil button, which invites visitors to start reviewing.
+3. The admin page: annotations by status, alerts on suspicious text, status buttons, exports and the commands for Claude Code.
+4. The Markdown export for Claude Code: the safety rules first, then each annotation as data in its own block.
+5. On a phone: the remark bubble at the bottom of the screen, with the highlighted sentence still visible above it.
 
 == Changelog ==
 

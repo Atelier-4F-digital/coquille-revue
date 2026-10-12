@@ -6,6 +6,11 @@ Extension WordPress open source pour relire un site directement sur ses pages : 
 
 ▶ [Essayer dans WordPress Playground](https://playground.wordpress.net/?blueprint-url=https://raw.githubusercontent.com/Atelier-4F-digital/coquille-revue/main/wporg-assets/blueprints/blueprint-fr.json) : un WordPress jetable en français dans votre navigateur, avec la dernière version de l'extension, le mode public activé et une page d'exemple à relire. Rien n'est installé chez vous. La même démo existe [en anglais](https://playground.wordpress.net/?blueprint-url=https://raw.githubusercontent.com/Atelier-4F-digital/coquille-revue/main/wporg-assets/blueprints/blueprint.json).
 
+<p>
+  <a href="docs/screenshots/fr/1-bulle-correction.png"><img src="docs/screenshots/fr/1-bulle-correction.png" width="49%" alt="Mode relecture sur une page publique : une phrase surlignée et la bulle de remarque avec la correction saisie"></a>
+  <a href="docs/screenshots/fr/3-page-administration.png"><img src="docs/screenshots/fr/3-page-administration.png" width="49%" alt="La page d'administration de Coquille Revue : les annotations en attente avec leurs alertes, les boutons de statut et les exports"></a>
+</p>
+
 ---
 
 ## Ce que fait l'extension
@@ -15,6 +20,16 @@ Extension WordPress open source pour relire un site directement sur ses pages : 
 - **Un e-mail de remerciement** part au contributeur quand sa suggestion est appliquée, s'il a laissé son adresse (ou s'il était connecté).
 - **Avec Claude Code**, la commande `/coquille-revue:apply-review` cherche chaque texte (articles et pages, menus, options, champs personnalisés, termes, fichiers du thème et des extensions, traductions), montre l'avant/après et n'applique qu'avec votre accord, annotation par annotation.
 - **Traduisible** : interface en anglais et en français (langue du site, et dans l'administration celle de chaque utilisateur), modèle de traduction `languages/coquille-revue.pot` fourni. Les e-mails partent dans la langue du site.
+
+## Captures d'écran
+
+<p>
+  <a href="docs/screenshots/fr/2-fenetre-information-crayon.png"><img src="docs/screenshots/fr/2-fenetre-information-crayon.png" width="42%" alt="La fenêtre d'information du bouton crayon, qui invite le visiteur à commencer la relecture"></a>
+  <a href="docs/screenshots/fr/4-export-markdown-claude-code.png"><img src="docs/screenshots/fr/4-export-markdown-claude-code.png" width="42%" alt="L'export Markdown pour Claude Code : les règles de sécurité, puis chaque annotation comme une donnée dans son propre bloc"></a>
+  <a href="docs/screenshots/fr/5-mobile-bulle.png"><img src="docs/screenshots/fr/5-mobile-bulle.png" width="12%" alt="Sur téléphone : la bulle de remarque en bas de l'écran, sous la phrase surlignée"></a>
+</p>
+
+La fenêtre d'information du bouton crayon, l'export Markdown pour Claude Code et la bulle de remarque sur téléphone.
 
 ## Installation
 
