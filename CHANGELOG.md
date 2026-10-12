@@ -36,7 +36,7 @@ All notable changes to Coquille Revue. Format based on [Keep a Changelog](https:
 - `coquille_revue_rate_limits` filter: an array of positive integers, `ip_5min` (5 by default), `ip_hour` (10), `site_hour` (30) and `user_5min` (60); a missing or invalid value keeps its default. The admin page shows the limits in force.
 - Uninstall: deleting the plugin from the Plugins screen removes the annotations table, the settings and the scheduled tasks, on every site of the network (`uninstall.php`). Deactivating keeps everything.
 - `readme.txt` in English for the WordPress.org directory (description, privacy, FAQ, changelog).
-- **Try it in WordPress Playground** link in the README files: `wporg-assets/blueprints/blueprint.json` installs the latest release, turns on public mode and opens a sample page to review.
+- **Try it in WordPress Playground** link in the README files: `wporg-assets/blueprints/blueprint.json` installs the latest release, turns on public mode and opens a sample page to review; `blueprint-fr.json`, linked from the French README, does the same on a site in French with a French sample page.
 - Releases also carry `coquille-revue.zip` (fixed name), so that `releases/latest/download/coquille-revue.zip` always points to the latest version.
 - Development tools, left out of the zip (see `CONTRIBUTING.md`):
   - Composer development dependencies with exact versions and a lock that installs on PHP 7.4 to 8.4: PHP_CodeSniffer with WordPress Coding Standards 3 and PHPCompatibilityWP, PHPUnit 9.6 and the PHPUnit Polyfills.

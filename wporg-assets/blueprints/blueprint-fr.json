@@ -1,0 +1,53 @@
+{
+  "$schema": "https://playground.wordpress.net/blueprint-schema.json",
+  "meta": {
+    "title": "Démo de Coquille Revue en français",
+    "description": "Installe la dernière version de Coquille Revue sur un site en français, active le mode public et ouvre une page d’exemple à relire.",
+    "author": "Atelier-4F-digital",
+    "categories": [
+      "Content"
+    ]
+  },
+  "landingPage": "/?pagename=demo-coquille-revue",
+  "preferredVersions": {
+    "php": "8.3",
+    "wp": "latest"
+  },
+  "login": true,
+  "steps": [
+    {
+      "step": "setSiteLanguage",
+      "language": "fr_FR"
+    },
+    {
+      "step": "installPlugin",
+      "pluginData": {
+        "resource": "url",
+        "url": "https://github.com/Atelier-4F-digital/coquille-revue/releases/latest/download/coquille-revue.zip"
+      },
+      "options": {
+        "activate": true,
+        "targetFolderName": "coquille-revue"
+      }
+    },
+    {
+      "step": "setSiteOptions",
+      "options": {
+        "coquille_revue_require_login": "0"
+      }
+    },
+    {
+      "step": "wp-cli",
+      "command": [
+        "wp",
+        "post",
+        "create",
+        "--post_type=page",
+        "--post_status=publish",
+        "--post_name=demo-coquille-revue",
+        "--post_title=Démo de Coquille Revue",
+        "--post_content=Cette page contient quelques fautes laissées exprès. Trouvez-les et proposez une correction, comme le ferait un relecteur.\n\n<h2>Notre boulangerie</h2>\n\nNous cuisons du pain frais chaque matins depuis 1998, avec la farine d’un moulin prés du village.\n\nLa boutique est ouverte du mardi au Dimanche, de 7 h à 19 h. Elle est fermé les jours fériés.\n\n<h2>Comment relire cette page</h2>\n\n1. Cliquez sur le bouton crayon pour activer le mode relecture.\n2. Sélectionnez un mot ou une phrase (ou faites un cliquer-glisser sur une zone), choisissez correction, suggestion ou question, écrivez votre remarque et appuyez sur Entrée.\n3. Ouvrez Coquille Revue dans le menu de l’administration : l’annotation s’y trouve, avec son statut, les exports CSV, JSON et Markdown pour Claude Code, et les réglages.\n\nLe mode public est activé dans cette démo : les visiteurs non connectés peuvent aussi annoter."
+      ]
+    }
+  ]
+}

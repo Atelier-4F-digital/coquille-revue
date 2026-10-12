@@ -59,7 +59,7 @@ bash bin/test-local.sh --filter Alerts
 
 ### Essayer dans WordPress Playground
 
-- **En ligne** : le lien « Try it in WordPress Playground » du README charge `wporg-assets/blueprints/blueprint.json`, qui installe la dernière release publiée (`releases/latest/download/coquille-revue.zip`), active le mode public et ouvre une page d'exemple. Ce dossier correspondra au dossier `assets/blueprints/` de WordPress.org.
+- **En ligne** : le lien « Try it in WordPress Playground » de README.en.md charge `wporg-assets/blueprints/blueprint.json`, qui installe la dernière release publiée (`releases/latest/download/coquille-revue.zip`), active le mode public et ouvre une page d'exemple ; le lien de README.md charge `blueprint-fr.json`, la même démo sur un site en français (étape `setSiteLanguage`) avec une page d'exemple en français. Ce dossier correspondra au dossier `assets/blueprints/` de WordPress.org.
 - **En local, avec le dossier de travail** (Node 20.10 ou plus), depuis la racine du dépôt :
 
   ```bash
