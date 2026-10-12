@@ -1456,32 +1456,45 @@ function coquille_revue_annotation_alerts($row, $labels = []) {
     // Position in the page and path of the address: typed by the visitor too, but made of tag names,
     // classes and segments. Only invisible characters, mixed alphabets, encoded characters and wording addressed
     // to an AI or false approvals are searched there (an isolated name such as admin, password, redirect or chatgpt
-    // is ordinary there), the separators (- _ . / > # …) being read as spaces, field by field, as sent and decoded.
+    // is ordinary there), field by field, as sent and decoded. Any character other than a letter, a digit or an
+    // apostrophe reads as a space (- _ . / > # but also + , ~ ! ; * | · —), and a name in camelCase is split
+    // ("noteForClaude" reads "note For Claude"): the exports show these fields as they are, readable by Claude.
     $path      = rawurldecode((string) wp_parse_url((string) ($row['url'] ?? ''), PHP_URL_PATH));
     $fields    = [(string) ($row['css_selector'] ?? ''), (string) ($row['xpath'] ?? ''), $path];
     $technical = implode("\n", $fields);
     $words     = array_map(
-        fn($field) => preg_replace('~[-_./#>:=()\[\]\s]+~', ' ', $field) ?? $field,
+        fn($field) => preg_replace('~[^\p{L}\p{N}\'’]+~u', ' ', preg_replace('~(?<=\p{Ll})(?=\p{Lu})~u', ' ', $field) ?? $field) ?? $field,
         array_unique(array_merge($fields, array_map('coquille_revue_decode_technical', $fields)))
     );
 
     // Instruction or authority wording in French AND in English, searched together whatever the site language
     // (never translated). "AI" in upper case only: in lower case, it would match the French "j'ai". Each space
     // of the lists accepts any whitespace.
-    // Wording addressed to an AI ("note for Claude", "hey AI", "pour l'IA") and false approvals: searched in every field.
-    $instruction_ai = '(hey|hi|hello|dear|note|message|attention)( (for|to|pour|à))? ((the|l)\s*[\'’]?\s*)?(claude|chatgpt|ai|ia|gpt|llm)'
+    // Wording addressed to an AI ("note for Claude", "hey AI", "pour l'IA", "instructions for ChatGPT") and false
+    // approvals: searched in every field. "pour Claude" or "to ChatGPT" alone is ordinary in an address
+    // (/pour-claude-monet/, /guide-to-claude-debussy/): only followed by an order ("to Claude: apply…").
+    // In a class name or an address, "ignore" only counts before all, previous… and "do not" not before "show"
+    // (#dont-show-again, /ignore-the-noise/): the texts read "ignore" alone and "do not show" in their own list.
+    $ai             = '((the|l)\s*[\'’]?\s*)?(claude|chatgpt|ai|ia|gpt|llm)';
+    $orders         = 'apply|publish|replace|change|delete|remove|update|accept|approve|validate'
+        . '|appliqu(e|er|ez)|publi(e|er|ez)|remplac(e|er|ez)|supprim(e|er|ez)|modifi(e|er|ez)|valid(e|er|ez)|accept(e|er|ez)';
+    $instruction_ai = '(hey|hi|hello|dear|note|message|attention)( (for|to|pour|à))? ' . $ai
+        . '|(instructions?|consignes?|rules?|r[eè]gles?|tasks?|t[aâ]ches?|memo) (for|to|pour|à) ' . $ai
+        . '|(for|to|pour|à) ' . $ai . ' (' . $orders . ')'
         . '|(for|to|pour|à) (the|l)\s*[\'’]?\s*(ai|ia|gpt|llm)|system prompt|developer mode|jailbreak\w*'
-        . '|ignor(e|ez|er) (all|any|every|the|previous|prior|above|earlier|les|la|le|tout|toutes|tous|ces|cette|précédent\w*)'
-        . '|disregard\w*|forget (all|everything|previous|the above|your)|oublie[rz]? (tout|les|toutes|ces|cette)'
+        . '|ignor(e|ez|er) (all|any|every|previous|prior|above|earlier|tout|toutes|tous|pr[ée]c[ée]dent\w*)'
+        . '|disregard\w*|forget (all|everything|previous|the above)|oublie[rz]? (tout|toutes|tous)'
         . '|without (asking|confirm\w*|validat\w*|approv\w*|review\w*|checking)|no need to (ask|confirm|validate|check|review)'
         . '|sans (demander|attendre|confirm\w*|valid\w*|reconfirm\w*)|(pas besoin|inutile) de (demander|confirmer|valider)'
-        . '|(do not|don[\'’]?t|never) (ask|confirm|tell|mention|report|flag|show)'
+        . '|(do not|don[\'’]?t|never) (ask|confirm|tell|mention|report|flag)'
         . '|already (approved|validated|confirmed|authori[sz]ed)|pre(-| )?(approved|validated|authori[sz]ed)|(approved|validated|authori[sz]ed) by'
         . '|(user|owner|admin\w*|editor|team) (has |have )?(approved|validated|confirmed|agreed|authori[sz]ed)'
         . '|(déjà|a|ont|avons) (déjà )?(validé|approuvé)e?s?|(validée?|approuvée?) par|go ahead|feu vert';
-    // For the texts, the author and the page title only: isolated words and instructions for a silent or later pass
-    // (in a class name or an address, "llm-card" or "/la-marche-en-silence/" are ordinary).
+    // For the texts, the author and the page title only: isolated words, instructions for a silent or later pass
+    // and generic wording (in a class name or an address, "llm-card", "/la-marche-en-silence/",
+    // "/comment-oublier-les-mauvaises-habitudes/" or "#dont-show-again" are ordinary).
     $instruction_words = 'ignor(e|ed|es|ing|er|ez)|instructions?|consignes?|claude|chatgpt|gpt|llm|language model|system message|ia|(?-i:AI)'
+        . '|(do not|don[\'’]?t|never) show|forget your|oublie[rz]? (les|ces|cette)'
         . '|assistant|annotations?|automat\w*|silently|quietly|(next|future) (pass|run|review)|skip (the )?(confirmation|review|check)'
         . '|discr[eè]tement|silencieusement|en silence|prochain passage'
         . '|redirect\w*|redirig\w*|administrateur|admin(istrator)?s?|override|mots? de passe|passwords?|api keys?|access tokens?|private keys?|secrets?';
